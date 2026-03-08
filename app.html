@@ -1242,6 +1242,16 @@
           </div>
 
           <div class="tab-content active" id="tab-history">
+
+            <!-- STRATEGY HEALTH PANEL -->
+            <div id="strategy-health" style="display:none;margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid #1e2a3a;">
+              <div style="padding:10px 14px;background:#111820;display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-family:monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#ffd600;">📊 SALUD DE LA ESTRATEGIA</div>
+                <div id="sh-trade-count" style="font-family:monospace;font-size:9px;color:#4a5568;"></div>
+              </div>
+              <div id="sh-body" style="padding:14px;"></div>
+            </div>
+
             <div class="history-list" id="history-list">
               <div class="empty-state">
                 <div class="empty-state-icon">📋</div>
@@ -1298,18 +1308,20 @@
 
 <!-- SL ALERT MODAL -->
 <div class="sl-alert" id="sl-alert">
-  <div class="sl-alert-box">
-    <div class="sl-alert-icon">🛑</div>
-    <div class="sl-alert-title">STOP LOSS TOCADO</div>
-    <div class="sl-alert-msg">El EA cerro la posicion en el nivel definido. El plan funciono correctamente. Perder trades es parte del sistema.</div>
-    <div class="sl-alert-rule">
+  <div class="sl-alert-box" style="max-width:480px;">
+    <div class="sl-alert-icon" id="sl-icon">🛑</div>
+    <div class="sl-alert-title" id="sl-title">STOP LOSS TOCADO</div>
+    <div style="font-family:monospace;font-size:10px;letter-spacing:1px;color:#4a5568;margin-bottom:12px;" id="sl-meta"></div>
+    <div class="sl-alert-msg" id="sl-msg" style="font-size:15px;line-height:1.7;color:#e8edf5;margin-bottom:16px;font-style:italic;"></div>
+    <div class="sl-alert-rule" id="sl-rule" style="text-align:left;">
       📋 PROTOCOLO SL:<br>
-      • Si fue antes de 10 AM → NO operes el resto del dia<br>
-      • Si fue despues de 10 AM → maximo 1 trade mas<br>
       • Cierra la plataforma por 15 minutos<br>
-      • NO busques por que perdiste en el grafico
+      • NO analices el chart ahora — espera<br>
+      • Si fue antes de 10 AM → NO operes hoy<br>
+      • Si fue después de 10 AM → máximo 1 trade más
     </div>
-    <button class="btn btn-secondary" style="margin-bottom:8px" onclick="closeSLAlert()">Entendido — Acepto el resultado</button>
+    <div id="sl-strategy-warning" style="display:none;margin-top:12px;padding:10px 12px;background:rgba(255,214,0,.06);border:1px solid rgba(255,214,0,.25);border-radius:8px;font-size:12px;color:#ffd600;text-align:left;line-height:1.6;"></div>
+    <button class="btn btn-secondary" style="margin-top:16px;margin-bottom:8px;width:100%;" onclick="closeSLAlert()">Entendido — Acepto el resultado</button>
   </div>
 </div>
 
@@ -1623,8 +1635,8 @@ function simulatePriceMove(trade) {
 }
 
 function getProgress(trade) {
-  const dir = trade.dir;
-  if (dir === 'long') {
+  // Progress from SL to TP (0% = at SL, 100% = at TP)
+  if (trade.dir === 'long') {
     const totalRange = trade.tp - trade.sl;
     return Math.max(0, Math.min(100, ((trade.currentPrice - trade.sl) / totalRange) * 100));
   } else {
@@ -1633,10 +1645,22 @@ function getProgress(trade) {
   }
 }
 
+function getRealPnlR(trade) {
+  // Real P&L in R — from ENTRY, not from SL
+  const risk = Math.abs(parseFloat(trade.entry) - parseFloat(trade.sl));
+  if (risk === 0) return 0;
+  if (trade.dir === 'long') {
+    return (trade.currentPrice - parseFloat(trade.entry)) / risk;
+  } else {
+    return (parseFloat(trade.entry) - trade.currentPrice) / risk;
+  }
+}
+
 function renderMonitor(trade) {
   const progress = getProgress(trade);
-  const isPositive = progress > 50;
-  const pnlR = ((progress / 100) * trade.rr - (1 - progress/100)).toFixed(2);
+  const pnlR = getRealPnlR(trade);
+  const isPositive = pnlR >= 0;
+  const pnlRStr = (pnlR >= 0 ? '+' : '') + pnlR.toFixed(2) + 'R';
   const encouragement = ENCOURAGEMENTS[Math.floor(Date.now() / 30000) % ENCOURAGEMENTS.length];
 
   // Should chart be visible?
@@ -1663,9 +1687,9 @@ function renderMonitor(trade) {
           <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px">STOP LOSS</div>
           <div style="font-family:var(--font-mono);font-size:12px;color:var(--red)">${trade.sl.toLocaleString()}</div>
         </div>
-        <div style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);border-radius:6px;padding:8px;text-align:center">
+        <div style="background:${isPositive ? 'rgba(0,255,136,0.06)' : 'rgba(255,51,102,0.06)'};border:1px solid ${isPositive ? 'rgba(0,255,136,0.3)' : 'rgba(255,51,102,0.3)'};border-radius:6px;padding:8px;text-align:center">
           <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px">PRECIO ACTUAL</div>
-          <div style="font-family:var(--font-mono);font-size:14px;color:var(--accent);font-weight:700">${trade.currentPrice.toLocaleString(undefined,{maximumFractionDigits:1})}</div>
+          <div style="font-family:var(--font-mono);font-size:14px;color:${isPositive ? 'var(--green)' : 'var(--red)'};font-weight:700">${trade.currentPrice.toLocaleString(undefined,{maximumFractionDigits:1})}</div>
         </div>
         <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);border-radius:6px;padding:8px;text-align:center">
           <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px">TAKE PROFIT</div>
@@ -1673,14 +1697,25 @@ function renderMonitor(trade) {
         </div>
       </div>
 
-      <!-- PROGRESS -->
+      <!-- P&L REAL + PROGRESS -->
       <div class="progress-section">
-        <div class="progress-label">
-          <span>Trayecto al TP</span>
-          <span class="pct">${progress.toFixed(1)}%</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;">P&amp;L vs Entrada</span>
+            <span style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:${isPositive ? 'var(--green)' : 'var(--red)'};">${pnlRStr}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:${isPositive ? 'var(--green)' : 'var(--red)'};">(${(pnlR * parseFloat(trade.risk)).toFixed(2)}%)</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);">TP: ${progress.toFixed(1)}%</div>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill ${progress >= 50 ? 'positive' : 'neutral'}" style="width:${progress}%"></div>
+        <div class="progress-bar" style="position:relative;">
+          <!-- Entry marker at 50% of bar (SL=0%, entry=~riskPct%, TP=100%) -->
+          <div class="progress-fill ${isPositive ? 'positive' : 'negative'}" style="width:${progress}%"></div>
+          <div style="position:absolute;top:-4px;left:${Math.max(0,Math.min(98,(Math.abs(parseFloat(trade.entry)-parseFloat(trade.sl))/Math.abs(parseFloat(trade.tp)-parseFloat(trade.sl)))*100))}%;width:2px;height:calc(100%+8px);background:rgba(255,214,0,0.8);border-radius:1px;" title="Precio de entrada"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:var(--font-mono);font-size:9px;color:var(--muted);">
+          <span>SL ${parseFloat(trade.sl).toFixed(1)}</span>
+          <span style="color:rgba(255,214,0,0.7);">↑ Entrada ${parseFloat(trade.entry).toFixed(1)}</span>
+          <span>TP ${parseFloat(trade.tp).toFixed(1)}</span>
         </div>
       </div>
 
@@ -1769,7 +1804,12 @@ function closeTrade(trade, type) {
   trade.closeTime = new Date().toISOString();
 
   state.activeTrade = null;
-  // Update Firebase
+
+  // Show post-trade modal to capture result image + review
+  showPostTradeModal(trade);
+
+  // Update Firebase and local
+  saveToLocal(trade);
   updateTradeInFirebase(trade);
 
   // Update monitor
@@ -1790,7 +1830,7 @@ function closeTrade(trade, type) {
   updateHistory();
 
   if (type === 'sl') {
-    setTimeout(() => document.getElementById('sl-alert').classList.add('show'), 500);
+    setTimeout(() => showSLAlert(trade), 500);
   } else {
     setTimeout(() => {
       document.getElementById('tp-alert-msg').textContent =
@@ -1802,10 +1842,83 @@ function closeTrade(trade, type) {
 }
 
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // ALERTS
 // ═══════════════════════════════════════════════════════
+
+const SL_MESSAGES = [
+  { icon:"💪", title:"STOP LOSS EJECUTADO", msg:"El plan funcionó exactamente como fue diseñado. Definiste tu riesgo, lo aceptaste antes de entrar, y el EA lo respetó. Eso ES disciplina — no importa el resultado." },
+  { icon:"🧠", title:"PÉRDIDA CONTROLADA", msg:"Esta pérdida estaba calculada desde el momento en que entraste. No es un fracaso — es el costo de participar. Los traders profesionales pierden trades. La diferencia es que lo aceptan y siguen." },
+  { icon:"🔒", title:"RIESGO GESTIONADO", msg:"Perdiste exactamente lo que decidiste arriesgar. Ni un centavo más. Eso es gestión de riesgo en acción. Tu capital está protegido para el siguiente setup." },
+  { icon:"📐", title:"EL MERCADO TIENE LA RAZÓN", msg:"El precio no llegó al objetivo esta vez. No cuestionas al mercado — lo aceptas. Tu análisis fue válido, el setup era correcto. A veces el mercado simplemente no confirma." },
+  { icon:"🎯", title:"UNA BATALLA, NO LA GUERRA", msg:"Un SL no define tu estrategia. Define que seguiste tu plan. Los traders rentables no ganan todos los trades — ganan la ecuación de largo plazo. Tú estás construyendo esa ecuación." },
+  { icon:"⚡", title:"EJECUTADO CORRECTAMENTE", msg:"Entraste con setup válido, definiste SL, dejaste que el EA gestionara. Eso es todo lo que puedes controlar. El resultado es irrelevante frente a la calidad de tu proceso." },
+  { icon:"🌊", title:"FLUJO Y REFLUJO", msg:"El mercado siempre da otra oportunidad. Este setup no fue el indicado — el próximo puede serlo. Descansa, recarga, y vuelve cuando el mercado presente una estructura clara." },
+  { icon:"🔥", title:"LOS MEJORES TRADERS PIERDEN", msg:"Stan Weinstein, Paul Tudor Jones, todos los grandes han tenido series de pérdidas. Lo que los diferencia es que no cambian su sistema después de un SL. Mantén el plan." },
+];
+
+function showSLAlert(trade) {
+  const m = calcMetrics(state.trades);
+  const sl = SL_MESSAGES[Math.floor(Math.random() * SL_MESSAGES.length)];
+
+  document.getElementById("sl-icon").textContent = sl.icon;
+  document.getElementById("sl-title").textContent = sl.title;
+  document.getElementById("sl-msg").textContent = sl.msg;
+  document.getElementById("sl-meta").textContent =
+    (trade.dir === "long" ? "▲ LONG" : "▼ SHORT") + " · " + trade.pair +
+    " · -" + (trade.risk||1) + "% · RR 1:" + trade.rr;
+
+  // Strategy warning (only after 20+ trades)
+  const warn = document.getElementById("sl-strategy-warning");
+  const evaluation = evaluateStrategy(m);
+  if (evaluation) {
+    warn.style.display = "block";
+    warn.innerHTML = evaluation;
+  } else {
+    warn.style.display = "none";
+  }
+
+  document.getElementById("sl-alert").classList.add("show");
+}
+
+function evaluateStrategy(m) {
+  const MIN_TRADES = 20;
+  if (m.closed < MIN_TRADES) return null; // Not enough data
+
+  const issues = [];
+  const good = [];
+
+  // Win Rate analysis
+  if (m.wr < 35) issues.push("⚠️ Win Rate " + Math.round(m.wr) + "% — Muy bajo. Revisa la calidad de tus setups y los criterios de entrada.");
+  else if (m.wr < 45) issues.push("⚠️ Win Rate " + Math.round(m.wr) + "% — Por debajo del óptimo. Evalúa si estás entrando demasiado pronto o en zonas débiles.");
+  else if (m.wr >= 55) good.push("✅ Win Rate " + Math.round(m.wr) + "% — Sólido.");
+
+  // Profit Factor analysis
+  if (m.pf < 1.0) issues.push("🔴 Profit Factor " + m.pf.toFixed(2) + " — Estrategia no rentable. Estás perdiendo más de lo que ganas. Revisión urgente de RR o selectividad.");
+  else if (m.pf < 1.5) issues.push("⚠️ Profit Factor " + m.pf.toFixed(2) + " — Marginalmente rentable. Objetivo mínimo: 1.5. Sé más selectivo en los setups.");
+  else if (m.pf >= 2.0) good.push("✅ Profit Factor " + m.pf.toFixed(2) + " — Excelente.");
+
+  // Recovery Factor analysis
+  if (m.rf < 1.0) issues.push("⚠️ Recovery Factor " + m.rf.toFixed(2) + " — El drawdown supera las ganancias netas. Revisa el tamaño del riesgo por trade.");
+  else if (m.rf >= 3.0) good.push("✅ Recovery Factor " + m.rf.toFixed(2) + " — Estrategia robusta.");
+
+  // Consecutive losses pattern (check last 5 trades)
+  const last5 = state.trades.filter(t => t.status==="closed").slice(-5);
+  const consLosses = last5.filter(t => t.result==="sl").length;
+  if (consLosses >= 4) issues.push("🔴 " + consLosses + " de los últimos 5 trades en SL — Posible problema de contexto de mercado. Considera pausa y reevaluación del sesgo.");
+
+  if (issues.length === 0 && good.length > 0) return null; // All good, no need to show
+
+  if (issues.length > 0) {
+    return `<div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#ffd600;margin-bottom:8px;">📊 SALUD DE LA ESTRATEGIA (${m.closed} trades)</div>` +
+      issues.map(i => `<div style="margin-bottom:4px;">${i}</div>`).join("") +
+      `<div style="margin-top:8px;font-size:11px;color:#4a5568;">Mínimo 20 trades para diagnóstico fiable — actualmente: ${m.closed}</div>`;
+  }
+  return null;
+}
+
 function closeSLAlert() {
-  document.getElementById('sl-alert').classList.remove('show');
+  document.getElementById("sl-alert").classList.remove("show");
 }
 
 function closeTPAlert() {
@@ -1967,8 +2080,183 @@ function updateStats() {
 // ═══════════════════════════════════════════════════════
 // HISTORY
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// STRATEGY HEALTH PANEL
+// ═══════════════════════════════════════════════════════
+function renderStrategyHealth() {
+  const panel = document.getElementById("strategy-health");
+  const body  = document.getElementById("sh-body");
+  const count = document.getElementById("sh-trade-count");
+  if (!panel || !body) return;
+
+  const m = calcMetrics(state.trades);
+  const MIN = 20;
+
+  count.textContent = m.closed + " trades cerrados";
+
+  if (m.closed < MIN) {
+    // Show progress toward minimum sample
+    const pct = Math.round((m.closed / MIN) * 100);
+    panel.style.display = "block";
+    panel.style.borderColor = "#1e2a3a";
+    body.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-family:monospace;font-size:10px;color:#4a5568;margin-bottom:5px;">
+          <span>Acumulando muestra estadística...</span>
+          <span style="color:#ffd600;">${m.closed}/${MIN}</span>
+        </div>
+        <div style="height:6px;background:#0d1117;border-radius:3px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#1e2a3a,#ffd600);border-radius:3px;transition:width .5s;"></div>
+        </div>
+        <div style="font-size:11px;color:#4a5568;margin-top:8px;line-height:1.6;">
+          Necesitas <strong style="color:#e8edf5;">${MIN - m.closed} trades más</strong> para un diagnóstico fiable de tu estrategia.<br>
+          El análisis estadístico requiere muestra mínima de ${MIN} trades cerrados.
+        </div>
+      </div>
+      ${m.closed >= 10 ? renderMetricCards(m, true) : ""}
+    `;
+    return;
+  }
+
+  // Full analysis
+  panel.style.display = "block";
+
+  const score = getStrategyScore(m);
+  const scoreColor = score >= 75 ? "var(--green)" : score >= 50 ? "#ffd600" : "var(--red)";
+  const scoreLabel = score >= 75 ? "ESTRATEGIA SÓLIDA" : score >= 50 ? "ESTRATEGIA EN DESARROLLO" : "REVISAR ESTRATEGIA";
+  const scoreIcon  = score >= 75 ? "✅" : score >= 50 ? "⚠️" : "🔴";
+  panel.style.borderColor = score >= 75 ? "rgba(0,255,136,.25)" : score >= 50 ? "rgba(255,214,0,.25)" : "rgba(255,51,102,.25)";
+
+  const diagnostics = getDiagnostics(m);
+
+  body.innerHTML = `
+    <!-- Score header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #1e2a3a;">
+      <div>
+        <div style="font-size:11px;color:#4a5568;font-family:monospace;letter-spacing:1px;margin-bottom:3px;">${scoreIcon} ${scoreLabel}</div>
+        <div style="font-family:Syne,sans-serif;font-size:26px;font-weight:800;color:${scoreColor};">${score}/100</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:#4a5568;margin-bottom:4px;">Muestra: ${m.closed} trades</div>
+        <div style="font-size:11px;color:#4a5568;">${m.wins}W · ${m.losses}L · WR ${Math.round(m.wr)}%</div>
+      </div>
+    </div>
+
+    <!-- Metric cards -->
+    ${renderMetricCards(m, false)}
+
+    <!-- Diagnostics -->
+    ${diagnostics.length > 0 ? `
+    <div style="margin-top:14px;">
+      <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4a5568;text-transform:uppercase;margin-bottom:8px;">DIAGNÓSTICO</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${diagnostics.map(d => `
+        <div style="padding:8px 10px;border-radius:6px;background:${d.type==='ok'?'rgba(0,255,136,.05)':d.type==='warn'?'rgba(255,214,0,.05)':'rgba(255,51,102,.05)'};border:1px solid ${d.type==='ok'?'rgba(0,255,136,.15)':d.type==='warn'?'rgba(255,214,0,.15)':'rgba(255,51,102,.15)'};font-size:12px;line-height:1.6;color:${d.type==='ok'?'rgba(0,255,136,.8)':d.type==='warn'?'rgba(255,214,0,.8)':'rgba(255,51,102,.8)'};">
+          ${d.text}
+        </div>`).join('')}
+      </div>
+    </div>` : ""}
+
+    <!-- Recommendations -->
+    ${score < 75 ? `
+    <div style="margin-top:12px;padding:10px 12px;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:6px;">
+      <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:var(--cyan);margin-bottom:6px;">💡 ACCIONES RECOMENDADAS</div>
+      <div style="font-size:12px;color:#4a5568;line-height:1.7;">${getRecommendations(m, score)}</div>
+    </div>` : `
+    <div style="margin-top:12px;padding:10px 12px;background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-radius:6px;font-size:12px;color:rgba(0,255,136,.8);line-height:1.6;">
+      ✅ Tu estrategia muestra métricas sólidas. Continúa con disciplina — el edge se mantiene siendo consistente en la ejecución.
+    </div>`}
+  `;
+}
+
+function renderMetricCards(m, preview) {
+  const pfVal   = m.pf === 999 ? "∞" : m.pf.toFixed(2);
+  const rfVal   = m.rf === 999 ? "∞" : m.rf.toFixed(2);
+  const pfColor = m.pf >= 2 ? "var(--green)" : m.pf >= 1.5 ? "#ffd600" : "var(--red)";
+  const rfColor = m.rf >= 3 ? "var(--green)" : m.rf >= 1.5 ? "#ffd600" : "var(--red)";
+  const wrColor = m.wr >= 50 ? "var(--green)" : m.wr >= 40 ? "#ffd600" : "var(--red)";
+  return `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;${preview?'opacity:.6':''}">
+    <div style="background:#060810;border:1px solid #1e2a3a;border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-family:monospace;font-size:8px;letter-spacing:1px;color:#4a5568;margin-bottom:4px;text-transform:uppercase;">Win Rate</div>
+      <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:${wrColor};">${m.closed>0?Math.round(m.wr)+"%" : "--"}</div>
+      <div style="font-family:monospace;font-size:9px;color:#4a5568;margin-top:2px;">Objetivo: ≥45%</div>
+    </div>
+    <div style="background:#060810;border:1px solid #1e2a3a;border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-family:monospace;font-size:8px;letter-spacing:1px;color:#4a5568;margin-bottom:4px;text-transform:uppercase;">Profit Factor</div>
+      <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:${pfColor};">${m.closed>0?pfVal:"--"}</div>
+      <div style="font-family:monospace;font-size:9px;color:#4a5568;margin-top:2px;">Objetivo: ≥1.5</div>
+    </div>
+    <div style="background:#060810;border:1px solid #1e2a3a;border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-family:monospace;font-size:8px;letter-spacing:1px;color:#4a5568;margin-bottom:4px;text-transform:uppercase;">Recovery Factor</div>
+      <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:${rfColor};">${m.closed>0?rfVal:"--"}</div>
+      <div style="font-family:monospace;font-size:9px;color:#4a5568;margin-top:2px;">Objetivo: ≥3.0</div>
+    </div>
+  </div>`;
+}
+
+function getStrategyScore(m) {
+  let score = 0;
+  // WR: max 30pts
+  if (m.wr >= 55) score += 30;
+  else if (m.wr >= 45) score += 22;
+  else if (m.wr >= 35) score += 12;
+  else score += 0;
+  // PF: max 40pts
+  if (m.pf >= 2.5) score += 40;
+  else if (m.pf >= 2.0) score += 32;
+  else if (m.pf >= 1.5) score += 22;
+  else if (m.pf >= 1.0) score += 10;
+  else score += 0;
+  // RF: max 30pts
+  if (m.rf >= 4) score += 30;
+  else if (m.rf >= 3) score += 24;
+  else if (m.rf >= 1.5) score += 14;
+  else if (m.rf >= 1) score += 6;
+  else score += 0;
+  return Math.min(100, score);
+}
+
+function getDiagnostics(m) {
+  const d = [];
+  // WR
+  if (m.wr >= 55) d.push({type:"ok", text:"✅ Win Rate " + Math.round(m.wr) + "% — Por encima del objetivo. Tus entradas son selectivas y precisas."});
+  else if (m.wr >= 45) d.push({type:"warn", text:"⚠️ Win Rate " + Math.round(m.wr) + "% — Acceptable pero optimizable. Enfócate en calidad sobre cantidad de setups."});
+  else if (m.wr >= 35) d.push({type:"warn", text:"⚠️ Win Rate " + Math.round(m.wr) + "% — Bajo. Evalúa si estás entrando en setups ambiguos o sin confluencia suficiente."});
+  else d.push({type:"error", text:"🔴 Win Rate " + Math.round(m.wr) + "% — Crítico. Revisa tus criterios de entrada. Considera aumentar el número de confluencias requeridas antes de entrar."});
+  // PF
+  if (m.pf >= 2.0) d.push({type:"ok", text:"✅ Profit Factor " + m.pf.toFixed(2) + " — Estrategia claramente rentable. Por cada dólar perdido, ganas " + m.pf.toFixed(2) + "."});
+  else if (m.pf >= 1.5) d.push({type:"warn", text:"⚠️ Profit Factor " + m.pf.toFixed(2) + " — Rentable pero ajustado. Objetivo mínimo 1.5 se cumple. Trabaja para llevarlo a 2.0+."});
+  else if (m.pf >= 1.0) d.push({type:"warn", text:"⚠️ Profit Factor " + m.pf.toFixed(2) + " — Al límite. Mínimamente rentable. Una serie de pérdidas puede hacerlo negativo. Acción necesaria."});
+  else d.push({type:"error", text:"🔴 Profit Factor " + m.pf.toFixed(2) + " — ESTRATEGIA NO RENTABLE. Las pérdidas superan las ganancias. Pausa obligatoria — revisa el sistema desde la raíz."});
+  // RF
+  if (m.rf >= 3) d.push({type:"ok", text:"✅ Recovery Factor " + m.rf.toFixed(2) + " — Sistema robusto. Recuperas el drawdown con eficiencia."});
+  else if (m.rf >= 1) d.push({type:"warn", text:"⚠️ Recovery Factor " + m.rf.toFixed(2) + " — El drawdown es significativo respecto a las ganancias. Considera reducir el riesgo por trade."});
+  else d.push({type:"error", text:"🔴 Recovery Factor " + m.rf.toFixed(2) + " — El drawdown supera las ganancias netas. Riesgo por trade probablemente muy alto o racha muy negativa."});
+  // Consecutive losses
+  const lastClosed = state.trades.filter(t=>t.status==="closed");
+  const last5 = lastClosed.slice(-5);
+  const consL = last5.filter(t=>t.result==="sl").length;
+  if (consL >= 4) d.push({type:"error", text:"🔴 " + consL + "/5 últimos trades en SL — Posible desalineamiento con el mercado actual. Pausa de 48-72h y reevalúa el sesgo antes de operar."});
+  else if (consL === 3) d.push({type:"warn", text:"⚠️ 3/5 últimos trades en SL — Presta atención al contexto actual del mercado. ¿Está en rango o consolidación?"});
+  return d;
+}
+
+function getRecommendations(m, score) {
+  const recs = [];
+  if (m.wr < 45) recs.push("• Aumenta el número de confluencias requeridas a mínimo 3 antes de entrar");
+  if (m.wr < 35) recs.push("• Considera operar solo setups A+ (CHoCH + OB + FVG + sesgo HTF alineado)");
+  if (m.pf < 1.5) recs.push("• Revisa si estás cerrando posiciones antes del TP — el EA debe gestionar hasta el objetivo");
+  if (m.pf < 1.0) recs.push("• Suspende el trading real — practica en demo hasta que el PF supere 1.5 en 20 trades");
+  if (m.rf < 1.5) recs.push("• Reduce el riesgo por trade al 0.5% hasta que el sistema se estabilice");
+  if (score < 50) recs.push("• Programa una sesión de backtesting de tus últimos " + m.closed + " trades para identificar el patrón de pérdidas");
+  if (recs.length === 0) recs.push("• Mantén la disciplina actual — el sistema está funcionando");
+  return recs.join("<br>");
+}
+
 function updateHistory() {
   const list = document.getElementById('history-list');
+  renderStrategyHealth();
 
   if (state.trades.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><span>Tu historial de trades aparecera aqui</span></div>';
@@ -2005,18 +2293,55 @@ function updateHistory() {
       </div>
 
       <!-- Image + Notes row (if any) -->
-      ${(t.img || t.notes) ? `
-      <div style="display:flex;gap:0;border-top:1px solid rgba(255,255,255,.04);">
-        ${t.img ? `
-        <div style="flex:0 0 180px;max-width:180px;border-right:1px solid rgba(255,255,255,.04);cursor:pointer;" onclick="openImgModal('${t.id}')">
-          <img src="${t.img}" style="width:100%;height:110px;object-fit:cover;display:block;opacity:.85;transition:opacity .2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">
+      ${(t.img || t.notes || t.imgAfter || t.review) ? `
+      <div style="border-top:1px solid rgba(255,255,255,.04);">
+
+        <!-- IMAGES ROW: BEFORE + AFTER -->
+        ${(t.img || t.imgAfter) ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid rgba(255,255,255,.04);">
+          <div style="position:relative;${t.imgAfter ? 'border-right:1px solid rgba(255,255,255,.04);' : ''}">
+            <div style="position:absolute;top:5px;left:6px;font-family:monospace;font-size:8px;letter-spacing:1px;background:rgba(0,0,0,.7);color:#4a5568;padding:2px 5px;border-radius:3px;z-index:1;">ANTES</div>
+            ${t.img ? `<img src="${t.img}" style="width:100%;height:130px;object-fit:cover;display:block;cursor:zoom-in;opacity:.85;transition:opacity .2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85" onclick="openImgFull('${t.id}','before')">` 
+            : `<div style="height:130px;display:flex;align-items:center;justify-content:center;color:#1e2a3a;font-size:11px;">Sin imagen</div>`}
+          </div>
+          <div style="position:relative;">
+            <div style="position:absolute;top:5px;left:6px;font-family:monospace;font-size:8px;letter-spacing:1px;background:rgba(0,0,0,.7);color:${isWin ? '#00ff88' : '#ff3366'};padding:2px 5px;border-radius:3px;z-index:1;">DESPUÉS ${isWin ? '✅' : '❌'}</div>
+            ${t.imgAfter ? `<img src="${t.imgAfter}" style="width:100%;height:130px;object-fit:cover;display:block;cursor:zoom-in;opacity:.85;transition:opacity .2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85" onclick="openImgFull('${t.id}','after')">` 
+            : `<div style="height:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#1e2a3a;font-size:20px;cursor:pointer;" onclick="addAfterImg('${t.id}')">
+                <div>📸</div><div style="font-size:9px;margin-top:4px;letter-spacing:1px;font-family:monospace;">+ RESULTADO</div></div>`}
+          </div>
         </div>` : ''}
-        ${t.notes ? `
-        <div style="flex:1;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.6;max-height:110px;overflow-y:auto;font-family:var(--font-body);">
-          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--accent);margin-bottom:5px;">📝 NOTA DEL ANÁLISIS</div>
-          ${t.notes}
+
+        <!-- NOTES + REVIEW ROW -->
+        ${(t.notes || t.review) ? `
+        <div style="display:grid;grid-template-columns:${t.notes && t.review ? '1fr 1fr' : '1fr'};gap:0;">
+          ${t.notes ? `
+          <div style="padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.6;${t.review ? 'border-right:1px solid rgba(255,255,255,.04);' : ''}">
+            <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--accent);margin-bottom:5px;">📝 ANÁLISIS PRE-ENTRADA</div>
+            <div style="max-height:80px;overflow-y:auto;">${t.notes}</div>
+          </div>` : ''}
+          ${t.review ? `
+          <div style="padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.6;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+              <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:#a78bfa;">📋 REVISIÓN POST-TRADE</div>
+              ${t.stars ? `<div style="font-size:11px;">${'⭐'.repeat(t.stars)}</div>` : ''}
+            </div>
+            <div style="max-height:80px;overflow-y:auto;">${t.review}</div>
+          </div>` : ''}
         </div>` : ''}
+
+        <!-- ADD AFTER IMG if no after img yet (closed trade) -->
+        ${!t.imgAfter && t.status === 'closed' && !t.img && !t.notes && !t.review ? `
+        <div style="padding:8px 12px;text-align:center;">
+          <button onclick="addAfterImg('${t.id}')" style="background:transparent;border:1px dashed #1e2a3a;color:#4a5568;font-family:monospace;font-size:9px;letter-spacing:1px;padding:7px 14px;border-radius:5px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#ffd600';this.style.color='#ffd600'" onmouseout="this.style.borderColor='#1e2a3a';this.style.color='#4a5568'">📸 + AGREGAR IMÁGENES Y REVISIÓN</button>
+        </div>` : ''}
+
+      </div>` : `
+      ${!isOpen ? `
+      <div style="border-top:1px solid rgba(255,255,255,.04);padding:8px 12px;text-align:center;">
+        <button onclick="addAfterImg('${t.id}')" style="background:transparent;border:1px dashed #1e2a3a;color:#4a5568;font-family:monospace;font-size:9px;letter-spacing:1px;padding:7px 14px;border-radius:5px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#ffd600';this.style.color='#ffd600'" onmouseout="this.style.borderColor='#1e2a3a';this.style.color='#4a5568'">📸 + AGREGAR IMÁGENES Y REVISIÓN</button>
       </div>` : ''}
+      `}
     </div>`;
   }).join('');
 }
@@ -2102,6 +2427,11 @@ function getFromLocal() {
     return trades.map(t => {
       if (t.img === "stored") {
         t.img = localStorage.getItem("qt_img_" + t.id) || null;
+      }
+      // Restore after image
+      if (!t.imgAfter) {
+        const after = localStorage.getItem("qt_imgafter_" + t.id);
+        if (after) t.imgAfter = after;
       }
       return t;
     });
@@ -2248,7 +2578,220 @@ if (!_raw) {
     }, 1000);
   });
 }
+
+// ═══════════════════════════════════════════════════════
+// POST-TRADE MODAL
+// ═══════════════════════════════════════════════════════
+let _ptmTrade = null;
+let _ptmAfterImg = null;
+let _ptmStars = 0;
+
+function showPostTradeModal(trade) {
+  _ptmTrade = trade;
+  _ptmAfterImg = null;
+  _ptmStars = 0;
+
+  const modal = document.getElementById("post-trade-modal");
+  modal.style.display = "flex";
+
+  // Subtitle
+  const isWin = trade.result === "tp";
+  const rr = parseFloat(trade.rr) || 1;
+  const risk = parseFloat(trade.risk) || 1;
+  const pnl = isWin ? "+" + (risk * rr).toFixed(2) + "%" : "-" + risk + "%";
+  document.getElementById("ptm-subtitle").textContent =
+    (trade.dir === "long" ? "▲ LONG" : "▼ SHORT") + " · " + trade.pair + " · " + pnl;
+
+  // Result box
+  const rb = document.getElementById("ptm-result-box");
+  rb.style.background = isWin ? "rgba(0,255,136,.06)" : "rgba(255,51,102,.06)";
+  rb.style.border = "1px solid " + (isWin ? "rgba(0,255,136,.25)" : "rgba(255,51,102,.25)");
+  rb.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;">
+      <div><div style="font-family:monospace;font-size:9px;color:#4a5568;letter-spacing:1px;margin-bottom:3px">RESULTADO</div>
+        <div style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:${isWin?"var(--green)":"var(--red)"}">${isWin?"✅ WIN":"❌ LOSS"}</div></div>
+      <div><div style="font-family:monospace;font-size:9px;color:#4a5568;letter-spacing:1px;margin-bottom:3px">P&amp;L</div>
+        <div style="font-family:monospace;font-size:14px;font-weight:700;color:${isWin?"var(--green)":"var(--red)"}">${pnl}</div></div>
+      <div><div style="font-family:monospace;font-size:9px;color:#4a5568;letter-spacing:1px;margin-bottom:3px">RR</div>
+        <div style="font-family:monospace;font-size:14px;color:#ffd600">1:${rr}</div></div>
+      <div><div style="font-family:monospace;font-size:9px;color:#4a5568;letter-spacing:1px;margin-bottom:3px">SETUP</div>
+        <div style="font-family:monospace;font-size:11px;color:#e8edf5;text-transform:uppercase">${trade.setup||"—"}</div></div>
+    </div>`;
+
+  // Show before image if exists
+  const beforeDiv = document.getElementById("ptm-before");
+  if (trade.img) {
+    beforeDiv.innerHTML = `<img src="${trade.img}" style="width:100%;height:140px;object-fit:cover;cursor:zoom-in;border-radius:6px;" onclick="openImgFull('${trade.id}','before')">`;
+  }
+
+  // Reset after drop
+  document.getElementById("ptm-after-label").innerHTML = `<div style="font-size:24px;margin-bottom:6px;">📸</div><div style="font-size:11px;color:#4a5568;">Arrastra captura del resultado</div>`;
+  document.getElementById("ptm-after-preview").style.display = "none";
+  document.getElementById("ptm-after-drop").style.display = "flex";
+  document.getElementById("ptm-review").value = "";
+
+  // Reset stars
+  setPtmStars(0);
+}
+
+function skipPostTrade() {
+  document.getElementById("post-trade-modal").style.display = "none";
+  _ptmTrade = null;
+  updateStats();
+  updateHistory();
+  renderJournal();
+}
+
+function handleAfterImgSelect(e) {
+  const file = e.target.files[0];
+  if (file) loadAfterImg(file);
+}
+function handleAfterImgDrop(e) {
+  e.preventDefault();
+  document.getElementById("ptm-after-drop").style.borderColor = "#1e2a3a";
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith("image/")) loadAfterImg(file);
+}
+function loadAfterImg(file) {
+  const r = new FileReader();
+  r.onload = ev => {
+    _ptmAfterImg = ev.target.result;
+    const prev = document.getElementById("ptm-after-preview");
+    prev.src = _ptmAfterImg;
+    prev.style.display = "block";
+    prev.style.cursor = "zoom-in";
+    prev.onclick = () => openImgFullSrc(_ptmAfterImg);
+    document.getElementById("ptm-after-drop").style.display = "none";
+  };
+  r.readAsDataURL(file);
+}
+
+function setPtmStars(n) {
+  _ptmStars = n;
+  const btns = document.getElementById("ptm-stars").querySelectorAll("button");
+  btns.forEach((b, i) => {
+    b.style.background = i < n ? "rgba(255,214,0,.15)" : "transparent";
+    b.style.borderColor = i < n ? "rgba(255,214,0,.4)" : "#1e2a3a";
+    b.style.color = i < n ? "#ffd600" : "#4a5568";
+  });
+}
+
+function addAfterImg(tradeId) {
+  const t = state.trades.find(x => x.id === tradeId);
+  if (!t) return;
+  // Restore imgAfter from localStorage if stored
+  if (!t.imgAfter) {
+    const stored = localStorage.getItem("qt_imgafter_" + t.id);
+    if (stored) t.imgAfter = stored;
+  }
+  showPostTradeModal(t);
+}
+
+function savePostTrade() {
+  if (!_ptmTrade) return;
+  _ptmTrade.imgAfter = _ptmAfterImg || null;
+  _ptmTrade.review = document.getElementById("ptm-review").value.trim();
+  _ptmTrade.stars = _ptmStars;
+  if (_ptmAfterImg) localStorage.setItem("qt_imgafter_" + _ptmTrade.id, _ptmAfterImg);
+  saveToLocal(_ptmTrade);
+  updateTradeInFirebase(_ptmTrade);
+  document.getElementById("post-trade-modal").style.display = "none";
+  _ptmTrade = null;
+  updateStats();
+  updateHistory();
+  renderJournal();
+}
+
+function openImgFull(tradeId, which) {
+  const t = state.trades.find(x => x.id === tradeId);
+  if (!t) return;
+  const src = which === "after" ? (t.imgAfter || localStorage.getItem("qt_imgafter_" + t.id)) : t.img;
+  if (!src) return;
+  openImgFullSrc(src);
+}
+function openImgFullSrc(src) {
+  const m = document.getElementById("img-modal-fs");
+  document.getElementById("img-modal-fs-img").src = src;
+  m.style.display = "flex";
+}
+
 </script>
+
+<!-- POST-TRADE MODAL -->
+<div id="post-trade-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9998;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:#0d1117;border:1px solid #1e2a3a;border-radius:16px;padding:28px;max-width:600px;width:95%;max-height:90vh;overflow-y:auto;">
+    
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;color:#ffd600;">📸 Registro Post-Trade</div>
+        <div id="ptm-subtitle" style="font-family:monospace;font-size:10px;color:#4a5568;margin-top:3px;letter-spacing:1px;"></div>
+      </div>
+      <button onclick="skipPostTrade()" style="background:transparent;border:1px solid #1e2a3a;color:#4a5568;font-family:monospace;font-size:9px;padding:6px 10px;border-radius:4px;cursor:pointer;">OMITIR</button>
+    </div>
+
+    <!-- Images side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      
+      <!-- BEFORE -->
+      <div>
+        <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4a5568;text-transform:uppercase;margin-bottom:6px;">📊 ANTES — Análisis</div>
+        <div id="ptm-before" style="border-radius:8px;overflow:hidden;background:#060810;border:1px solid #1e2a3a;height:140px;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:11px;color:#4a5568;">Sin imagen</span>
+        </div>
+      </div>
+
+      <!-- AFTER -->
+      <div>
+        <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4a5568;text-transform:uppercase;margin-bottom:6px;">📸 DESPUÉS — Resultado</div>
+        <div id="ptm-after-drop" 
+          style="border:2px dashed #1e2a3a;border-radius:8px;padding:0;cursor:pointer;position:relative;height:140px;display:flex;align-items:center;justify-content:center;background:rgba(255,214,0,.01);transition:border-color .2s;"
+          ondragover="event.preventDefault();this.style.borderColor='#ffd600'"
+          ondragleave="this.style.borderColor='#1e2a3a'"
+          ondrop="handleAfterImgDrop(event)">
+          <input type="file" id="ptm-after-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="handleAfterImgSelect(event)">
+          <div id="ptm-after-label" style="text-align:center;pointer-events:none;">
+            <div style="font-size:24px;margin-bottom:6px;">📸</div>
+            <div style="font-size:11px;color:#4a5568;">Arrastra captura del resultado</div>
+          </div>
+        </div>
+        <img id="ptm-after-preview" style="display:none;width:100%;height:140px;object-fit:cover;border-radius:8px;border:1px solid #1e2a3a;margin-top:0;" alt="">
+      </div>
+    </div>
+
+    <!-- Result summary -->
+    <div id="ptm-result-box" style="padding:12px 14px;border-radius:8px;margin-bottom:14px;"></div>
+
+    <!-- Review section -->
+    <div style="margin-bottom:14px;">
+      <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4a5568;text-transform:uppercase;margin-bottom:6px;">📝 REVISIÓN POST-TRADE</div>
+      <textarea id="ptm-review" placeholder="¿Qué salió bien? ¿Qué mejorar? ¿Seguiste el plan? Lección aprendida..." 
+        style="width:100%;background:#060810;border:1px solid #1e2a3a;border-radius:6px;color:#e8edf5;font-family:'DM Sans',sans-serif;font-size:12px;padding:10px;outline:none;resize:vertical;min-height:80px;line-height:1.5;transition:border-color .2s;"
+        onfocus="this.style.borderColor='#ffd600'" onblur="this.style.borderColor='#1e2a3a'"></textarea>
+    </div>
+
+    <!-- Execution quality -->
+    <div style="margin-bottom:18px;">
+      <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;color:#4a5568;text-transform:uppercase;margin-bottom:8px;">⭐ CALIDAD DE EJECUCIÓN</div>
+      <div style="display:flex;gap:8px;" id="ptm-stars">
+        ${[1,2,3,4,5].map(i=>`<button onclick="setPtmStars(${i})" data-star="${i}" style="flex:1;padding:10px;border:1px solid #1e2a3a;background:transparent;color:#4a5568;border-radius:6px;font-size:18px;cursor:pointer;transition:all .2s;">⭐</button>`).join('')}
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div style="display:flex;gap:10px;">
+      <button onclick="savePostTrade()" style="flex:1;padding:13px;border:none;border-radius:8px;background:#ffd600;color:#000;font-family:Syne,sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;">
+        💾 GUARDAR REGISTRO COMPLETO
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- IMG FULLSCREEN MODAL -->
+<div id="img-modal-fs" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out;backdrop-filter:blur(4px);" onclick="this.style.display='none'">
+  <img id="img-modal-fs-img" style="max-width:92vw;max-height:92vh;border-radius:8px;border:1px solid #1e2a3a;">
+  <div style="position:fixed;top:16px;right:20px;font-family:monospace;font-size:11px;color:#4a5568;">Click para cerrar</div>
+</div>
 
 </body>
 </html>
