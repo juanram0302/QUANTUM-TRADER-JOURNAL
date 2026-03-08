@@ -1,180 +1,81 @@
 // ═══════════════════════════════════════════════════════
-// QUANTUM TRADER — AUTH SYSTEM
-// Sistema de autenticación con aprobación manual
+// QUANTUM TRADER — AUTH SYSTEM (Firebase)
 // ═══════════════════════════════════════════════════════
 
-const AUTH = {
+import { auth, db } from "./firebase.js";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  doc, setDoc, getDoc, updateDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  // ─── ADMIN CREDENTIALS (cambiar antes de publicar) ───
-  ADMIN_EMAIL: 'admin@quantumtrader.pro',
-  ADMIN_PASS:  'quantum2025',
+export const ADMIN_EMAIL = "admin@quantumtrader.pro";
 
-  // ─── INIT ───
-  init() {
-    // Crear admin por defecto si no existe
-    const users = this.getUsers();
-    const adminExists = users.find(u => u.email === this.ADMIN_EMAIL);
-    if (!adminExists) {
-      users.push({
-        id: 'admin',
-        name: 'Admin',
-        email: this.ADMIN_EMAIL,
-        password: this.ADMIN_PASS,
-        role: 'admin',
-        status: 'approved',
-        registeredAt: new Date().toISOString(),
-        approvedAt: new Date().toISOString(),
-        country: 'Admin',
-        experience: '',
-        acceptedTerms: true,
-        lastLogin: null,
-        tradesCount: 0,
-      });
-      this.saveUsers(users);
+export async function register({ name, email, password, acceptedTerms }) {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await setDoc(doc(db, "users", cred.user.uid), {
+      name, email, role: "student", status: "pending",
+      acceptedTerms, registeredAt: serverTimestamp(),
+      approvedAt: null, lastLogin: null, tradesCount: 0, notes: "",
+    });
+    await signOut(auth);
+    return { ok: true };
+  } catch (e) { return { ok: false, msg: firebaseError(e.code) }; }
+}
+
+export async function login(email, password) {
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const snap = await getDoc(doc(db, "users", cred.user.uid));
+    if (!snap.exists()) { await signOut(auth); return { ok: false, msg: "Usuario no encontrado." }; }
+    const user = { uid: cred.user.uid, ...snap.data() };
+    if (user.status === "pending") {
+      await signOut(auth);
+      return { ok: false, msg: "Tu cuenta está pendiente de aprobación.", status: "pending" };
     }
-  },
-
-  // ─── REGISTER ───
-  register(data) {
-    const users = this.getUsers();
-
-    // Check email duplicado
-    if (users.find(u => u.email === data.email)) {
-      return { ok: false, msg: 'Este email ya está registrado.' };
+    if (user.status === "rejected") {
+      await signOut(auth);
+      return { ok: false, msg: "Tu acceso ha sido rechazado. Contacta al administrador.", status: "rejected" };
     }
-
-    const user = {
-      id: 'u_' + Date.now(),
-      name: data.name,
-      email: data.email,
-      password: data.password,
-      role: 'student',
-      status: 'pending', // pending | approved | rejected
-      registeredAt: new Date().toISOString(),
-      approvedAt: null,
-      acceptedTerms: data.acceptedTerms,
-      lastLogin: null,
-      tradesCount: 0,
-      notes: '',
-    };
-
-    users.push(user);
-    this.saveUsers(users);
-    return { ok: true, user };
-  },
-
-  // ─── LOGIN ───
-  login(email, password) {
-    this.init();
-    const users = this.getUsers();
-    const user = users.find(u => u.email === email && u.password === password);
-
-    if (!user) return { ok: false, msg: 'Email o contraseña incorrectos.' };
-    if (user.status === 'pending') return { ok: false, msg: 'Tu cuenta está pendiente de aprobación. El admin revisará tu solicitud pronto.', status: 'pending' };
-    if (user.status === 'rejected') return { ok: false, msg: 'Tu acceso ha sido rechazado. Contacta al administrador.', status: 'rejected' };
-
-    // Update last login
-    user.lastLogin = new Date().toISOString();
-    this.saveUsers(users);
-
-    // Save session
-    sessionStorage.setItem('qt_session', JSON.stringify({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      loginAt: new Date().toISOString(),
+    await updateDoc(doc(db, "users", cred.user.uid), { lastLogin: serverTimestamp() });
+    sessionStorage.setItem("qt_session", JSON.stringify({
+      uid: user.uid, name: user.name, email: user.email, role: user.role
     }));
-
     return { ok: true, user };
-  },
+  } catch (e) { return { ok: false, msg: firebaseError(e.code) }; }
+}
 
-  // ─── LOGOUT ───
-  logout() {
-    sessionStorage.removeItem('qt_session');
-    window.location.href = 'login.html';
-  },
+export async function logout() {
+  await signOut(auth);
+  sessionStorage.removeItem("qt_session");
+  window.location.href = "index.html";
+}
 
-  // ─── GET SESSION ───
-  getSession() {
-    const s = sessionStorage.getItem('qt_session');
-    return s ? JSON.parse(s) : null;
-  },
+export function getSession() {
+  const s = sessionStorage.getItem("qt_session");
+  return s ? JSON.parse(s) : null;
+}
 
-  // ─── REQUIRE AUTH ───
-  requireAuth(adminOnly = false) {
-    const session = this.getSession();
-    if (!session) {
-      window.location.href = 'login.html';
-      return null;
-    }
-    if (adminOnly && session.role !== 'admin') {
-      window.location.href = 'app.html';
-      return null;
-    }
-    return session;
-  },
+export function requireAuth(adminOnly = false) {
+  const session = getSession();
+  if (!session) { window.location.href = "index.html"; return null; }
+  if (adminOnly && session.role !== "admin") { window.location.href = "app.html"; return null; }
+  return session;
+}
 
-  // ─── ADMIN: APPROVE USER ───
-  approveUser(userId) {
-    const users = this.getUsers();
-    const user = users.find(u => u.id === userId);
-    if (!user) return false;
-    user.status = 'approved';
-    user.approvedAt = new Date().toISOString();
-    this.saveUsers(users);
-    return true;
-  },
-
-  // ─── ADMIN: REJECT USER ───
-  rejectUser(userId) {
-    const users = this.getUsers();
-    const user = users.find(u => u.id === userId);
-    if (!user) return false;
-    user.status = 'rejected';
-    this.saveUsers(users);
-    return true;
-  },
-
-  // ─── ADMIN: DELETE USER ───
-  deleteUser(userId) {
-    let users = this.getUsers();
-    users = users.filter(u => u.id !== userId);
-    this.saveUsers(users);
-    return true;
-  },
-
-  // ─── ADMIN: UPDATE NOTES ───
-  updateNotes(userId, notes) {
-    const users = this.getUsers();
-    const user = users.find(u => u.id === userId);
-    if (!user) return false;
-    user.notes = notes;
-    this.saveUsers(users);
-    return true;
-  },
-
-  // ─── STORAGE ───
-  getUsers() {
-    const raw = localStorage.getItem('qt_users');
-    return raw ? JSON.parse(raw) : [];
-  },
-
-  saveUsers(users) {
-    localStorage.setItem('qt_users', JSON.stringify(users));
-  },
-
-  // ─── STATS FOR ADMIN ───
-  getStats() {
-    const users = this.getUsers().filter(u => u.role !== 'admin');
-    return {
-      total: users.length,
-      pending: users.filter(u => u.status === 'pending').length,
-      approved: users.filter(u => u.status === 'approved').length,
-      rejected: users.filter(u => u.status === 'rejected').length,
-    };
-  },
-};
-
-// Auto-init
-AUTH.init();
+function firebaseError(code) {
+  const map = {
+    "auth/email-already-in-use": "Este email ya está registrado.",
+    "auth/invalid-email": "Email inválido.",
+    "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
+    "auth/user-not-found": "Email o contraseña incorrectos.",
+    "auth/wrong-password": "Email o contraseña incorrectos.",
+    "auth/invalid-credential": "Email o contraseña incorrectos.",
+    "auth/too-many-requests": "Demasiados intentos. Intenta más tarde.",
+  };
+  return map[code] || "Error: " + code;
+}

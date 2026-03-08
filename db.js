@@ -1,85 +1,89 @@
 // ═══════════════════════════════════════════════════════
-// QUANTUM TRADER — DATABASE (localStorage)
-// Manejo de trades por usuario
+// QUANTUM TRADER — DATABASE (Firebase Firestore)
 // ═══════════════════════════════════════════════════════
 
-const DB = {
+import { db } from "./firebase.js";
+import {
+  collection, doc, addDoc, updateDoc, getDocs,
+  query, where, orderBy, serverTimestamp, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  // ─── TRADES ───
-  getTrades(userId) {
-    const key = 'qt_trades_' + userId;
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  },
+// ─── ADD TRADE ───
+export async function addTrade(userId, trade) {
+  const ref = await addDoc(collection(db, "trades"), {
+    ...trade, userId, status: "open", result: null,
+    openTime: serverTimestamp(), closeTime: null,
+  });
+  await updateDoc(doc(db, "users", userId), {
+    tradesCount: (trade.tradesCount || 0) + 1
+  });
+  return ref.id;
+}
 
-  saveTrades(userId, trades) {
-    localStorage.setItem('qt_trades_' + userId, JSON.stringify(trades));
-  },
+// ─── CLOSE TRADE ───
+export async function closeTrade(tradeId, result) {
+  await updateDoc(doc(db, "trades", tradeId), {
+    status: "closed", result, closeTime: serverTimestamp()
+  });
+}
 
-  addTrade(userId, trade) {
-    const trades = this.getTrades(userId);
-    trade.id = 't_' + Date.now();
-    trade.openTime = new Date().toISOString();
-    trade.status = 'open';
-    trade.result = null;
-    trades.push(trade);
-    this.saveTrades(userId, trades);
+// ─── GET USER TRADES ───
+export async function getUserTrades(userId) {
+  const q = query(
+    collection(db, "trades"),
+    where("userId", "==", userId),
+    orderBy("openTime", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
 
-    // Update user trade count
-    const users = AUTH.getUsers();
-    const user = users.find(u => u.id === userId);
-    if (user) { user.tradesCount = trades.length; AUTH.saveUsers(users); }
+// ─── GET USER STATS ───
+export async function getUserStats(userId) {
+  const trades = await getUserTrades(userId);
+  const closed = trades.filter(t => t.status === "closed");
+  const wins   = closed.filter(t => t.result === "tp");
 
-    return trade;
-  },
+  let pnl = 0;
+  closed.forEach(t => {
+    if (t.result === "tp") pnl += parseFloat(t.risk) * parseFloat(t.rr);
+    else pnl -= parseFloat(t.risk);
+  });
 
-  closeTrade(userId, tradeId, result) {
-    const trades = this.getTrades(userId);
-    const trade = trades.find(t => t.id === tradeId);
-    if (!trade) return false;
-    trade.status = 'closed';
-    trade.result = result;
-    trade.closeTime = new Date().toISOString();
-    this.saveTrades(userId, trades);
-    return true;
-  },
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0,0,0,0);
+  const weekTrades = trades.filter(t => {
+    const d = t.openTime?.toDate ? t.openTime.toDate() : new Date(t.openTime);
+    return d >= weekStart;
+  });
 
-  // ─── STATS PER USER ───
-  getUserStats(userId) {
-    const trades = this.getTrades(userId).filter(t => t.status === 'closed');
-    const wins = trades.filter(t => t.result === 'tp');
-    const losses = trades.filter(t => t.result === 'sl');
+  return {
+    total: closed.length,
+    wins: wins.length,
+    losses: closed.length - wins.length,
+    winRate: closed.length > 0 ? Math.round((wins.length / closed.length) * 100) : 0,
+    pnl: parseFloat(pnl.toFixed(2)),
+    weekTrades: weekTrades.length,
+    open: trades.filter(t => t.status === "open").length,
+  };
+}
 
-    let pnl = 0;
-    trades.forEach(t => {
-      if (t.result === 'tp') pnl += parseFloat(t.risk) * parseFloat(t.rr);
-      else pnl -= parseFloat(t.risk);
-    });
+// ─── ADMIN: GET ALL USERS ───
+export async function getAllUsers() {
+  const snap = await getDocs(collection(db, "users"));
+  return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+}
 
-    // Weekly trades
-    const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay());
-    weekStart.setHours(0,0,0,0);
-    const weekTrades = this.getTrades(userId).filter(t => new Date(t.openTime) >= weekStart);
+// ─── ADMIN: UPDATE USER STATUS ───
+export async function setUserStatus(uid, status) {
+  const data = { status };
+  if (status === "approved") data.approvedAt = serverTimestamp();
+  await updateDoc(doc(db, "users", uid), data);
+}
 
-    return {
-      total: trades.length,
-      wins: wins.length,
-      losses: losses.length,
-      winRate: trades.length > 0 ? Math.round((wins.length / trades.length) * 100) : 0,
-      pnl: parseFloat(pnl.toFixed(2)),
-      weekTrades: weekTrades.length,
-      open: this.getTrades(userId).filter(t => t.status === 'open').length,
-    };
-  },
-
-  // ─── ADMIN: ALL USERS STATS ───
-  getAllUsersStats() {
-    const users = AUTH.getUsers().filter(u => u.role !== 'admin' && u.status === 'approved');
-    return users.map(u => ({
-      ...u,
-      stats: this.getUserStats(u.id),
-    }));
-  },
-};
+// ─── ADMIN: UPDATE NOTES ───
+export async function updateUserNotes(uid, notes) {
+  await updateDoc(doc(db, "users", uid), { notes });
+}

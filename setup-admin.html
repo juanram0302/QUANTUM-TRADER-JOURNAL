@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Setup Admin — Quantum Trader</title>
+<style>
+  body{background:#060810;color:#e8edf5;font-family:monospace;display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:20px;}
+  .box{background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;padding:40px;max-width:480px;width:90%;text-align:center;}
+  h1{color:#ffd600;font-size:20px;margin-bottom:8px;}
+  p{color:#4a5568;font-size:13px;line-height:1.6;margin-bottom:24px;}
+  input{width:100%;background:#060810;border:1px solid #1e2a3a;border-radius:6px;color:#e8edf5;font-family:monospace;font-size:14px;padding:10px 14px;outline:none;margin-bottom:12px;}
+  input:focus{border-color:#ffd600;}
+  button{width:100%;padding:14px;border:none;border-radius:8px;background:#ffd600;color:#000;font-weight:700;font-size:14px;cursor:pointer;}
+  button:disabled{background:#2d3748;color:#4a5568;cursor:not-allowed;}
+  .msg{margin-top:16px;padding:12px;border-radius:6px;font-size:12px;display:none;line-height:1.5;}
+  .msg.ok{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);color:#00ff88;}
+  .msg.err{background:rgba(255,51,102,0.08);border:1px solid rgba(255,51,102,0.3);color:#ff3366;}
+  .msg.show{display:block;}
+  .warning{background:rgba(255,170,0,0.08);border:1px solid rgba(255,170,0,0.3);color:#ffaa00;padding:12px;border-radius:6px;font-size:12px;margin-bottom:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>⚙️ Setup Admin</h1>
+  <p>Crea tu cuenta de administrador en Firebase.<br>Solo necesitas hacer esto UNA VEZ.</p>
+  <div class="warning">⚠️ Después de crear tu admin, <strong>elimina este archivo</strong> de tu repositorio por seguridad.</div>
+  <input type="email" id="email" placeholder="tu@email.com" value="admin@quantumtrader.pro">
+  <input type="password" id="pass" placeholder="Contraseña del admin (min 6 caracteres)">
+  <input type="text" id="name" placeholder="Tu nombre" value="Admin">
+  <button id="btn" onclick="createAdmin()">CREAR CUENTA ADMIN</button>
+  <div class="msg" id="msg"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey:"AIzaSyAOp7iCsYvbzBJlHD_Pni-8w1jaAagCGvU",
+  authDomain:"quantum-trader-2bfb8.firebaseapp.com",
+  projectId:"quantum-trader-2bfb8",
+  storageBucket:"quantum-trader-2bfb8.firebasestorage.app",
+  messagingSenderId:"10367039371",
+  appId:"1:10367039371:web:98ab364add4459b103a18e"
+});
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+function showMsg(text,type){const el=document.getElementById("msg");el.textContent=text;el.className="msg show "+type;}
+
+window.createAdmin = async () => {
+  const email = document.getElementById("email").value.trim();
+  const pass  = document.getElementById("pass").value;
+  const name  = document.getElementById("name").value.trim();
+  if(!email||!pass||!name){showMsg("Completa todos los campos.","err");return;}
+  const btn = document.getElementById("btn");
+  btn.disabled=true; btn.textContent="Creando...";
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await setDoc(doc(db,"users",cred.user.uid),{
+      name, email, role:"admin", status:"approved",
+      acceptedTerms:true, registeredAt:serverTimestamp(),
+      approvedAt:serverTimestamp(), lastLogin:null,
+      tradesCount:0, notes:"Cuenta administrador"
+    });
+    await signOut(auth);
+    showMsg("✅ Admin creado correctamente. Ya puedes iniciar sesión en index.html\n\n⚠️ IMPORTANTE: Elimina este archivo (setup-admin.html) de tu repositorio ahora.","ok");
+    btn.textContent="✅ ADMIN CREADO";
+  } catch(e) {
+    const errs={"auth/email-already-in-use":"Este email ya está registrado. Si ya tienes cuenta, ve directo a index.html.","auth/weak-password":"La contraseña debe tener al menos 6 caracteres."};
+    showMsg(errs[e.code]||"Error: "+e.code,"err");
+    btn.disabled=false; btn.textContent="CREAR CUENTA ADMIN";
+  }
+};
+</script>
+</body>
+</html>

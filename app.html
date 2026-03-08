@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Journal — Quantum Trader</title>
+<title>Quantum Trader Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -1014,7 +1014,7 @@
 </head>
 <body>
 
-
+<div class="container">
 
   <!-- HEADER -->
   <div class="header">
@@ -1868,26 +1868,46 @@ function switchTab(name) {
 updateStats();
 updateHistory();
 </script>
-<script src="auth.js"></script>
-<script src="db.js"></script>
-<script>
-  const _session = AUTH.requireAuth();
-  if (_session) {
-    // Inject topbar
-    document.body.insertAdjacentHTML('afterbegin', `
-      <div style="position:sticky;top:0;z-index:200;background:rgba(6,8,16,0.97);backdrop-filter:blur(12px);border-bottom:1px solid #1e2a3a;padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:52px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:#ffd600;">QUANTUM TRADER</span>
-          <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;background:rgba(255,214,0,0.1);color:#ffd600;padding:3px 8px;border-radius:4px;border:1px solid rgba(255,214,0,0.2);">JOURNAL</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:16px;">
-          <span style="font-family:'Space Mono',monospace;font-size:10px;color:#4a5568;">Hola, ${_session.name}</span>
-          ${_session.role === 'admin' ? '<a href="admin.html" style="font-family:\'Space Mono\',monospace;font-size:9px;letter-spacing:1px;color:#ffd600;text-decoration:none;padding:5px 10px;border:1px solid rgba(255,214,0,0.3);border-radius:4px;">ADMIN</a>' : ''}
-          <button onclick="AUTH.logout()" style="background:transparent;border:1px solid #1e2a3a;color:#4a5568;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;padding:5px 10px;border-radius:4px;cursor:pointer;">SALIR</button>
-        </div>
-      </div>
-    `);
-  }
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+const _app = initializeApp({
+  apiKey:"AIzaSyAOp7iCsYvbzBJlHD_Pni-8w1jaAagCGvU",
+  authDomain:"quantum-trader-2bfb8.firebaseapp.com",
+  projectId:"quantum-trader-2bfb8",
+  storageBucket:"quantum-trader-2bfb8.firebasestorage.app",
+  messagingSenderId:"10367039371",
+  appId:"1:10367039371:web:98ab364add4459b103a18e"
+});
+const _auth = getAuth(_app);
+const _raw = sessionStorage.getItem("qt_session");
+if (!_raw) {
+  window.location.href = "index.html";
+} else {
+  const _u = JSON.parse(_raw);
+  const bar = document.createElement("div");
+  bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(6,8,16,0.97);backdrop-filter:blur(12px);border-bottom:1px solid #1e2a3a;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;";
+  const adminLink = _u.role === "admin" ? '<a href="admin.html" style="font-family:monospace;font-size:9px;color:#ffd600;text-decoration:none;padding:5px 10px;border:1px solid rgba(255,214,0,0.3);border-radius:4px">ADMIN</a>' : "";
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:#ffd600">QUANTUM TRADER</span>
+      <span style="font-family:monospace;font-size:9px;letter-spacing:2px;background:rgba(255,214,0,0.1);color:#ffd600;padding:3px 8px;border-radius:4px;border:1px solid rgba(255,214,0,0.2)">JOURNAL</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:monospace;font-size:10px;color:#4a5568">Hola, ${_u.name}</span>
+      ${adminLink}
+      <button id="_btnout" style="background:transparent;border:1px solid #1e2a3a;color:#4a5568;font-family:monospace;font-size:9px;padding:5px 10px;border-radius:4px;cursor:pointer">SALIR</button>
+    </div>`;
+  document.body.prepend(bar);
+  document.body.style.paddingTop = "52px";
+  document.getElementById("_btnout").onclick = async () => {
+    await signOut(_auth);
+    sessionStorage.removeItem("qt_session");
+    window.location.href = "index.html";
+  };
+}
 </script>
+
 </body>
 </html>

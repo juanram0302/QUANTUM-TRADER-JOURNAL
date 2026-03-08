@@ -6,228 +6,168 @@
 <title>Quantum Trader — SMC PRO</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg:#060810;--surface:#0d1117;--border:#1e2a3a;
-    --gold:#ffd600;--gold2:#ffe580;--gold3:#b8860b;
-    --text:#e8edf5;--muted:#4a5568;--muted2:#2d3748;
-    --green:#00ff88;--red:#ff3366;
-    --fd:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fm:'Space Mono',monospace;
-  }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
-  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,214,0,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,214,0,0.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
-
-  .page{display:grid;grid-template-columns:1fr 420px;min-height:100vh;}
-
-  /* LEFT HERO */
-  .hero{display:flex;flex-direction:column;justify-content:center;padding:60px 60px 60px 80px;position:relative;overflow:hidden;}
-  .hero::after{content:'';position:absolute;right:0;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,transparent,rgba(255,214,0,0.3),transparent);}
-
-  .hero-logo{width:380px;max-width:100%;margin-bottom:48px;filter:drop-shadow(0 0 20px rgba(255,214,0,0.2));}
-
-  .hero-title{font-family:var(--fd);font-size:13px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--gold);opacity:0.7;margin-bottom:24px;}
-
-  .hero-features{display:flex;flex-direction:column;gap:16px;margin-bottom:48px;}
-  .feat{display:flex;align-items:flex-start;gap:14px;}
-  .feat-icon{width:36px;height:36px;border-radius:8px;background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-  .feat-text{flex:1;}
-  .feat-name{font-family:var(--fd);font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px;}
-  .feat-desc{font-size:12px;color:var(--muted);line-height:1.5;}
-
-  .hero-quote{font-style:italic;font-size:13px;color:var(--muted);border-left:2px solid rgba(255,214,0,0.4);padding-left:16px;line-height:1.7;}
-
-  /* RIGHT PANEL */
-  .auth-panel{background:var(--surface);display:flex;flex-direction:column;justify-content:center;padding:48px 40px;border-left:1px solid var(--border);}
-
-  .auth-tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:8px;margin-bottom:32px;}
-  .auth-tab{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);font-family:var(--fm);font-size:10px;letter-spacing:1px;text-transform:uppercase;border-radius:6px;cursor:pointer;transition:all .2s;}
-  .auth-tab.active{background:#1a1400;color:var(--gold);}
-
-  .auth-form{display:none;}
-  .auth-form.active{display:block;}
-
-  .form-title{font-family:var(--fd);font-size:22px;font-weight:700;color:var(--gold);margin-bottom:6px;}
-  .form-sub{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.5;}
-
-  .fgroup{margin-bottom:16px;}
-  label{display:block;font-family:var(--fm);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
-  input[type=text],input[type=email],input[type=password]{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fb);font-size:14px;padding:11px 14px;outline:none;transition:border-color .2s;}
-  input:focus{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,214,0,0.08);}
-
-  .terms-row{display:flex;align-items:flex-start;gap:10px;margin:16px 0;}
-  .terms-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;margin-top:2px;}
-  .terms-row span{font-size:12px;color:var(--muted);line-height:1.5;}
-  .terms-row a{color:var(--gold);text-decoration:none;}
-
-  .btn{width:100%;padding:14px;border:none;border-radius:8px;font-family:var(--fd);font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .2s;margin-top:8px;}
-  .btn-gold{background:var(--gold);color:#000;}
-  .btn-gold:hover{background:var(--gold2);box-shadow:0 0 24px rgba(255,214,0,0.3);transform:translateY(-1px);}
-
-  .msg{padding:12px 14px;border-radius:6px;font-size:12px;margin-top:16px;display:none;line-height:1.5;}
-  .msg.ok{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);color:var(--green);}
-  .msg.err{background:rgba(255,51,102,0.08);border:1px solid rgba(255,51,102,0.3);color:var(--red);}
-  .msg.info{background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.3);color:var(--gold);}
-  .msg.show{display:block;}
-
-  .divider{height:1px;background:var(--border);margin:20px 0;}
-  .link-row{text-align:center;font-size:12px;color:var(--muted);}
-  .link-row a{color:var(--gold);text-decoration:none;cursor:pointer;}
-
-  @media(max-width:900px){
-    .page{grid-template-columns:1fr;}
-    .hero{display:none;}
-    .auth-panel{padding:40px 24px;}
-  }
+:root{--bg:#060810;--surface:#0d1117;--border:#1e2a3a;--gold:#ffd600;--gold2:#ffe580;--text:#e8edf5;--muted:#4a5568;--green:#00ff88;--red:#ff3366;--fd:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fm:'Space Mono',monospace;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,214,0,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,214,0,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+.page{display:grid;grid-template-columns:1fr 420px;min-height:100vh;}
+.hero{display:flex;flex-direction:column;justify-content:center;padding:60px 60px 60px 80px;position:relative;}
+.hero::after{content:'';position:absolute;right:0;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,transparent,rgba(255,214,0,.3),transparent);}
+.hero-logo{width:380px;max-width:100%;margin-bottom:48px;filter:drop-shadow(0 0 20px rgba(255,214,0,.2));}
+.hero-title{font-family:var(--fd);font-size:13px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:24px;}
+.hero-features{display:flex;flex-direction:column;gap:16px;margin-bottom:48px;}
+.feat{display:flex;align-items:flex-start;gap:14px;}
+.feat-icon{width:36px;height:36px;border-radius:8px;background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.feat-name{font-family:var(--fd);font-size:14px;font-weight:600;margin-bottom:2px;}
+.feat-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+.hero-quote{font-style:italic;font-size:13px;color:var(--muted);border-left:2px solid rgba(255,214,0,.4);padding-left:16px;line-height:1.7;}
+.auth-panel{background:var(--surface);display:flex;flex-direction:column;justify-content:center;padding:48px 40px;border-left:1px solid var(--border);}
+.auth-tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:8px;margin-bottom:32px;}
+.auth-tab{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);font-family:var(--fm);font-size:10px;letter-spacing:1px;text-transform:uppercase;border-radius:6px;cursor:pointer;transition:all .2s;}
+.auth-tab.active{background:#1a1400;color:var(--gold);}
+.auth-form{display:none;}
+.auth-form.active{display:block;}
+.form-title{font-family:var(--fd);font-size:22px;font-weight:700;color:var(--gold);margin-bottom:6px;}
+.form-sub{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.5;}
+.fgroup{margin-bottom:16px;}
+label{display:block;font-family:var(--fm);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+input[type=text],input[type=email],input[type=password]{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fb);font-size:14px;padding:11px 14px;outline:none;transition:border-color .2s;}
+input:focus{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,214,0,.08);}
+.terms-row{display:flex;align-items:flex-start;gap:10px;margin:16px 0;}
+.terms-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);flex-shrink:0;margin-top:2px;}
+.terms-row span{font-size:12px;color:var(--muted);line-height:1.5;}
+.terms-row a{color:var(--gold);text-decoration:none;}
+.btn{width:100%;padding:14px;border:none;border-radius:8px;font-family:var(--fd);font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .2s;margin-top:8px;}
+.btn-gold{background:var(--gold);color:#000;}
+.btn-gold:hover{background:var(--gold2);box-shadow:0 0 24px rgba(255,214,0,.3);transform:translateY(-1px);}
+.btn-gold:disabled{background:#2d3748;color:#4a5568;cursor:not-allowed;transform:none;box-shadow:none;}
+.msg{padding:12px 14px;border-radius:6px;font-size:12px;margin-top:16px;display:none;line-height:1.6;}
+.msg.ok{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3);color:var(--green);}
+.msg.err{background:rgba(255,51,102,.08);border:1px solid rgba(255,51,102,.3);color:var(--red);}
+.msg.info{background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.3);color:var(--gold);}
+.msg.show{display:block;}
+@media(max-width:900px){.page{grid-template-columns:1fr;}.hero{display:none;}.auth-panel{padding:40px 24px;}}
 </style>
 </head>
 <body>
 <div class="page">
-
-  <!-- HERO -->
   <div class="hero">
     <img src="logo.svg" alt="Quantum Trader" class="hero-logo">
     <div class="hero-title">Sistema Profesional de Trading</div>
     <div class="hero-features">
-      <div class="feat">
-        <div class="feat-icon">📋</div>
-        <div class="feat-text">
-          <div class="feat-name">Journal con Checklist Pre-Entrada</div>
-          <div class="feat-desc">8 criterios del plan BOS/CHoCH. Si no cumples todos, no entras.</div>
-        </div>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">🔒</div>
-        <div class="feat-text">
-          <div class="feat-name">Monitor Anti-Emocional</div>
-          <div class="feat-desc">El gráfico se bloquea mientras el trade no esté en profit. Elimina el impulso de cerrar antes de tiempo.</div>
-        </div>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">🤖</div>
-        <div class="feat-text">
-          <div class="feat-name">Estado del EA en Tiempo Real</div>
-          <div class="feat-desc">Monitoreo de BE, trailing, L3 y L4 del Quantum Smart Manager Pro v15.2.</div>
-        </div>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">📊</div>
-        <div class="feat-text">
-          <div class="feat-name">Estadísticas Semanales</div>
-          <div class="feat-desc">Control de límites: máximo 3 trades/semana, -2% máximo. Disciplina medible.</div>
-        </div>
-      </div>
+      <div class="feat"><div class="feat-icon">📋</div><div><div class="feat-name">Journal con Checklist Pre-Entrada</div><div class="feat-desc">8 criterios del plan BOS/CHoCH. Si no cumples todos, no entras.</div></div></div>
+      <div class="feat"><div class="feat-icon">🔒</div><div><div class="feat-name">Monitor Anti-Emocional</div><div class="feat-desc">El gráfico se bloquea mientras el trade no esté en profit. Elimina el impulso de cerrar antes de tiempo.</div></div></div>
+      <div class="feat"><div class="feat-icon">🤖</div><div><div class="feat-name">Estado del EA en Tiempo Real</div><div class="feat-desc">BE, trailing, L3 y L4 del Quantum Smart Manager Pro v15.2.</div></div></div>
+      <div class="feat"><div class="feat-icon">📊</div><div><div class="feat-name">Estadísticas Semanales</div><div class="feat-desc">Máximo 3 trades/semana, -2% límite. Disciplina medible.</div></div></div>
     </div>
-    <div class="hero-quote">
-      "Tu trabajo de trader termina cuando abres la posición.<br>
-      Todo lo demás lo gestiona el EA."<br>
-      <span style="color:var(--gold);opacity:0.6;font-size:11px;margin-top:4px;display:block">— Plan de Trading BOS/CHoCH v2.0</span>
-    </div>
+    <div class="hero-quote">"Tu trabajo termina cuando abres la posición. Todo lo demás lo gestiona el EA."<br><span style="color:var(--gold);opacity:.6;font-size:11px;display:block;margin-top:4px">— Plan BOS/CHoCH v2.0</span></div>
   </div>
 
-  <!-- AUTH PANEL -->
   <div class="auth-panel">
-
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="showTab('login')">Iniciar Sesión</button>
       <button class="auth-tab" onclick="showTab('register')">Registrarse</button>
     </div>
 
-    <!-- LOGIN -->
     <div class="auth-form active" id="form-login">
       <div class="form-title">Bienvenido</div>
       <div class="form-sub">Accede a tu journal de trading profesional.</div>
-
-      <div class="fgroup">
-        <label>Email</label>
-        <input type="email" id="l-email" placeholder="tu@email.com">
-      </div>
-      <div class="fgroup">
-        <label>Contraseña</label>
-        <input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button class="btn btn-gold" onclick="doLogin()">ENTRAR AL SISTEMA</button>
+      <div class="fgroup"><label>Email</label><input type="email" id="l-email" placeholder="tu@email.com"></div>
+      <div class="fgroup"><label>Contraseña</label><input type="password" id="l-pass" placeholder="••••••••"></div>
+      <button class="btn btn-gold" id="btn-login" onclick="doLogin()">ENTRAR AL SISTEMA</button>
       <div class="msg" id="l-msg"></div>
     </div>
 
-    <!-- REGISTER -->
     <div class="auth-form" id="form-register">
       <div class="form-title">Solicitar Acceso</div>
-      <div class="form-sub">Tu solicitud será revisada y aprobada manualmente. Recibirás acceso una vez aprobado.</div>
-
-      <div class="fgroup">
-        <label>Nombre Completo</label>
-        <input type="text" id="r-name" placeholder="Tu nombre completo">
-      </div>
-      <div class="fgroup">
-        <label>Email</label>
-        <input type="email" id="r-email" placeholder="tu@email.com">
-      </div>
-      <div class="fgroup">
-        <label>Contraseña</label>
-        <input type="password" id="r-pass" placeholder="Mínimo 8 caracteres">
-      </div>
+      <div class="form-sub">Tu solicitud será revisada manualmente. El admin te aprobará y podrás acceder.</div>
+      <div class="fgroup"><label>Nombre Completo</label><input type="text" id="r-name" placeholder="Tu nombre completo"></div>
+      <div class="fgroup"><label>Email</label><input type="email" id="r-email" placeholder="tu@email.com"></div>
+      <div class="fgroup"><label>Contraseña</label><input type="password" id="r-pass" placeholder="Mínimo 6 caracteres"></div>
       <div class="terms-row">
         <input type="checkbox" id="r-terms">
-        <span>Acepto los <a href="#">Términos de Uso</a> y entiendo que el trading conlleva riesgo. Este sistema es educativo y no garantiza resultados.</span>
+        <span>Acepto los <a href="#">Términos de Uso</a>. Entiendo que el trading conlleva riesgo y este sistema es educativo.</span>
       </div>
-      <button class="btn btn-gold" onclick="doRegister()">SOLICITAR ACCESO</button>
+      <button class="btn btn-gold" id="btn-register" onclick="doRegister()">SOLICITAR ACCESO</button>
       <div class="msg" id="r-msg"></div>
     </div>
-
   </div>
 </div>
 
-<script src="auth.js"></script>
-<script>
-  // Redirect if already logged in
-  const session = AUTH.getSession();
-  if (session) {
-    window.location.href = session.role === 'admin' ? 'admin.html' : 'app.html';
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey:"AIzaSyAOp7iCsYvbzBJlHD_Pni-8w1jaAagCGvU",
+  authDomain:"quantum-trader-2bfb8.firebaseapp.com",
+  projectId:"quantum-trader-2bfb8",
+  storageBucket:"quantum-trader-2bfb8.firebasestorage.app",
+  messagingSenderId:"10367039371",
+  appId:"1:10367039371:web:98ab364add4459b103a18e"
+});
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// Redirect if session exists
+const s = sessionStorage.getItem("qt_session");
+if (s) { const u = JSON.parse(s); window.location.href = u.role==="admin"?"admin.html":"app.html"; }
+
+window.showTab = (tab) => {
+  document.querySelectorAll(".auth-tab").forEach((t,i)=>t.classList.toggle("active",["login","register"][i]===tab));
+  document.querySelectorAll(".auth-form").forEach((f,i)=>f.classList.toggle("active",["login","register"][i]===tab));
+};
+
+function msg(id,text,type){const el=document.getElementById(id);el.textContent=text;el.className="msg show "+type;}
+function setBtn(id,text,disabled){const b=document.getElementById(id);b.textContent=text;b.disabled=disabled;}
+
+window.doLogin = async () => {
+  const email = document.getElementById("l-email").value.trim();
+  const pass  = document.getElementById("l-pass").value;
+  if (!email||!pass){msg("l-msg","Completa todos los campos.","err");return;}
+  setBtn("btn-login","Verificando...",true);
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    const snap = await getDoc(doc(db,"users",cred.user.uid));
+    if (!snap.exists()){await signOut(auth);msg("l-msg","Usuario no encontrado.","err");setBtn("btn-login","ENTRAR AL SISTEMA",false);return;}
+    const user = snap.data();
+    if (user.status==="pending"){await signOut(auth);msg("l-msg","Tu cuenta está pendiente de aprobación. Vuelve pronto.","info");setBtn("btn-login","ENTRAR AL SISTEMA",false);return;}
+    if (user.status==="rejected"){await signOut(auth);msg("l-msg","Tu acceso fue rechazado. Contacta al administrador.","err");setBtn("btn-login","ENTRAR AL SISTEMA",false);return;}
+    await updateDoc(doc(db,"users",cred.user.uid),{lastLogin:serverTimestamp()});
+    sessionStorage.setItem("qt_session",JSON.stringify({uid:cred.user.uid,name:user.name,email:user.email,role:user.role}));
+    window.location.href = user.role==="admin"?"admin.html":"app.html";
+  } catch(e) {
+    const errs={"auth/invalid-credential":"Email o contraseña incorrectos.","auth/user-not-found":"Email o contraseña incorrectos.","auth/wrong-password":"Email o contraseña incorrectos.","auth/too-many-requests":"Demasiados intentos. Espera un momento."};
+    msg("l-msg",errs[e.code]||"Error: "+e.code,"err");
+    setBtn("btn-login","ENTRAR AL SISTEMA",false);
   }
+};
 
-  function showTab(tab) {
-    document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', ['login','register'][i] === tab));
-    document.querySelectorAll('.auth-form').forEach((f,i) => f.classList.toggle('active', ['login','register'][i] === tab));
+window.doRegister = async () => {
+  const name  = document.getElementById("r-name").value.trim();
+  const email = document.getElementById("r-email").value.trim();
+  const pass  = document.getElementById("r-pass").value;
+  const terms = document.getElementById("r-terms").checked;
+  if (!name||!email||!pass){msg("r-msg","Completa todos los campos.","err");return;}
+  if (!terms){msg("r-msg","Debes aceptar los términos de uso.","err");return;}
+  setBtn("btn-register","Enviando solicitud...",true);
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await setDoc(doc(db,"users",cred.user.uid),{
+      name,email,role:"student",status:"pending",acceptedTerms:true,
+      registeredAt:serverTimestamp(),approvedAt:null,lastLogin:null,tradesCount:0,notes:""
+    });
+    await signOut(auth);
+    msg("r-msg","✅ Solicitud enviada correctamente. El administrador revisará tu cuenta y te dará acceso.","ok");
+    ["r-name","r-email","r-pass"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("r-terms").checked=false;
+  } catch(e) {
+    const errs={"auth/email-already-in-use":"Este email ya está registrado.","auth/weak-password":"La contraseña debe tener al menos 6 caracteres.","auth/invalid-email":"Email inválido."};
+    msg("r-msg",errs[e.code]||"Error: "+e.code,"err");
   }
-
-  function showMsg(id, text, type) {
-    const el = document.getElementById(id);
-    el.textContent = text;
-    el.className = 'msg show ' + type;
-  }
-
-  function doLogin() {
-    const email = document.getElementById('l-email').value.trim();
-    const pass  = document.getElementById('l-pass').value;
-    if (!email || !pass) { showMsg('l-msg','Completa todos los campos.','err'); return; }
-
-    const res = AUTH.login(email, pass);
-    if (!res.ok) {
-      showMsg('l-msg', res.msg, res.status === 'pending' ? 'info' : 'err');
-      return;
-    }
-    window.location.href = res.user.role === 'admin' ? 'admin.html' : 'app.html';
-  }
-
-  function doRegister() {
-    const name  = document.getElementById('r-name').value.trim();
-    const email = document.getElementById('r-email').value.trim();
-    const pass  = document.getElementById('r-pass').value;
-    const terms = document.getElementById('r-terms').checked;
-
-    if (!name || !email || !pass) { showMsg('r-msg','Completa todos los campos.','err'); return; }
-    if (pass.length < 8) { showMsg('r-msg','La contraseña debe tener al menos 8 caracteres.','err'); return; }
-    if (!terms) { showMsg('r-msg','Debes aceptar los términos de uso.','err'); return; }
-
-    const res = AUTH.register({ name, email, password: pass, acceptedTerms: true });
-    if (!res.ok) { showMsg('r-msg', res.msg, 'err'); return; }
-
-    showMsg('r-msg', '✅ Solicitud enviada correctamente. El administrador revisará tu cuenta y te dará acceso. Vuelve a intentar iniciar sesión una vez aprobado.', 'ok');
-    document.getElementById('r-name').value = '';
-    document.getElementById('r-email').value = '';
-    document.getElementById('r-pass').value = '';
-    document.getElementById('r-terms').checked = false;
-  }
+  setBtn("btn-register","SOLICITAR ACCESO",false);
+};
 </script>
 </body>
 </html>
