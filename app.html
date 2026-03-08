@@ -1500,15 +1500,42 @@ function activateMonitor(trade) {
   state.monitorInterval = setInterval(() => simulatePriceMove(trade), 3000);
 }
 
+async function fetchRealPrice(symbol) {
+  try {
+    // Normalize symbol for Binance: BTC/USDT -> BTCUSDT
+    const sym = symbol.replace("/","").replace("PERPETUAL","").trim().toUpperCase();
+    const binanceSymbols = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT","DOGEUSDT"];
+    if (binanceSymbols.some(s => sym.includes(s.replace("USDT","")))) {
+      const clean = binanceSymbols.find(s => sym.includes(s.replace("USDT",""))) || sym;
+      const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + clean, {cache:"no-store"});
+      if (res.ok) { const d = await res.json(); return parseFloat(d.price); }
+    }
+  } catch(e) {}
+  return null;
+}
+
 function simulatePriceMove(trade) {
   if (!state.activeTrade || state.activeTrade.id !== trade.id) return;
 
-  const range = Math.abs(trade.tp - trade.sl);
-  // Bias 55% hacia el TP: LONG sube, SHORT baja
-  const bias = trade.dir === 'long' ? 0.45 : 0.55;
-  const rawMove = (Math.random() - bias) * range * 0.04;
-  trade.currentPrice = trade.currentPrice + rawMove;
+  // Try to get real price first
+  fetchRealPrice(trade.pair || trade.tvsymbol || "BTCUSDT").then(realPrice => {
+    if (realPrice && realPrice > 0) {
+      trade.currentPrice = realPrice;
+      renderMonitor(trade);
+      return;
+    }
+    // Fallback to simulation if real price unavailable
+    const range = Math.abs(trade.tp - trade.sl);
+    const bias = trade.dir === 'long' ? 0.45 : 0.55;
+    const rawMove = (Math.random() - bias) * range * 0.015;
+    trade.currentPrice = trade.currentPrice + rawMove;
 
+  }).catch(() => {
+    const range = Math.abs(trade.tp - trade.sl);
+    trade.currentPrice = trade.currentPrice + (Math.random() - 0.5) * range * 0.01;
+    renderMonitor(trade);
+  });
+  return; // async handles renderMonitor
   // Check SL
   if (trade.dir === 'long' && trade.currentPrice <= trade.sl) {
     trade.currentPrice = trade.sl;
