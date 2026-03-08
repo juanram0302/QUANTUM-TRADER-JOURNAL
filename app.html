@@ -1322,7 +1322,7 @@
 // ═══════════════════════════════════════════════════════
 let state = {
   activeTrade: null,
-  trades: [],
+  trades: [],  // loaded from Firebase on init
   checksCompleted: 0,
   totalChecks: 8,
   monitorInterval: null,
@@ -1473,6 +1473,8 @@ function registerTrade() {
   document.querySelectorAll('.check-item').forEach(el => el.classList.remove('checked'));
   state.checksCompleted = 0;
   document.getElementById('check-counter').textContent = '0/' + state.totalChecks;
+  // Save to Firebase
+  saveTradeToFirebase(trade);
   document.getElementById('gate-msg').classList.remove('ok');
   document.getElementById('gate-msg').querySelector('span:first-child').textContent = '⛔';
   document.getElementById('gate-text').textContent = 'Completa todos los criterios antes de registrar el trade';
@@ -1502,9 +1504,10 @@ function simulatePriceMove(trade) {
   if (!state.activeTrade || state.activeTrade.id !== trade.id) return;
 
   const range = Math.abs(trade.tp - trade.sl);
-  const move = (Math.random() - 0.38) * range * 0.04;
-
-  trade.currentPrice = trade.currentPrice + (trade.dir === 'long' ? move : -move);
+  // Bias 55% hacia el TP: LONG sube, SHORT baja
+  const bias = trade.dir === 'long' ? 0.45 : 0.55;
+  const rawMove = (Math.random() - bias) * range * 0.04;
+  trade.currentPrice = trade.currentPrice + rawMove;
 
   // Check SL
   if (trade.dir === 'long' && trade.currentPrice <= trade.sl) {
@@ -1643,7 +1646,7 @@ function renderMonitor(trade) {
       <div class="chart-zone">
         ${showChart ? `
           <iframe class="tv-frame"
-            src="https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${encodeURIComponent(trade.tvsymbol || trade.pair)}&interval=15&hidesidetoolbar=1&hidetoptoolbar=0&symboledit=1&saveimage=0&toolbarbg=0d1117&studies=[]&theme=dark&style=1&timezone=exchange&withdateranges=1&showpopupbutton=0&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[header_saveload,header_chart_type,header_compare]&locale=es"
+            src="https://s.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent((trade.tvsymbol||trade.pair).replace('/',''))}&interval=15&theme=dark&style=1&locale=es&toolbar_bg=%230d1117&hide_side_toolbar=0&allow_symbol_change=1&save_image=0"
             allowtransparency="true" allowfullscreen="">
           </iframe>
         ` : `
@@ -1688,6 +1691,8 @@ function closeTrade(trade, type) {
   trade.closeTime = new Date().toISOString();
 
   state.activeTrade = null;
+  // Update Firebase
+  updateTradeInFirebase(trade);
 
   // Update monitor
   document.getElementById('monitor-status-badge').textContent = 'SIN TRADE';
@@ -1867,11 +1872,63 @@ function switchTab(name) {
 // ═══════════════════════════════════════════════════════
 updateStats();
 updateHistory();
+
+// ═══════════════════════════════════════════════════════
+// FIREBASE TRADES SYNC
+// ═══════════════════════════════════════════════════════
+async function saveTradeToFirebase(trade) {
+  try {
+    const { addDoc, collection, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    if (!window._fbDb || !window._fbSession) return;
+    const ref = await addDoc(collection(window._fbDb, "trades"), {
+      ...trade, userId: window._fbSession.uid,
+      openTime: serverTimestamp(), ea: trade.ea
+    });
+    trade.fbId = ref.id;
+  } catch(e) { console.warn("Firebase save trade:", e); }
+}
+
+async function updateTradeInFirebase(trade) {
+  try {
+    if (!trade.fbId || !window._fbDb) return;
+    const { doc, updateDoc, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await updateDoc(doc(window._fbDb, "trades", trade.fbId), {
+      status: trade.status, result: trade.result,
+      closeTime: serverTimestamp(), currentPrice: trade.currentPrice, ea: trade.ea
+    });
+  } catch(e) { console.warn("Firebase update trade:", e); }
+}
+
+async function loadTradesFromFirebase() {
+  try {
+    if (!window._fbDb || !window._fbSession) return;
+    const { collection, query, where, orderBy, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const q = query(
+      collection(window._fbDb, "trades"),
+      where("userId", "==", window._fbSession.uid),
+      orderBy("openTime", "desc")
+    );
+    const snap = await getDocs(q);
+    state.trades = snap.docs.map(d => ({ fbId: d.id, ...d.data() }));
+    // Restore open trade if any
+    const open = state.trades.find(t => t.status === 'open');
+    if (open) {
+      state.activeTrade = open;
+      startPriceSimulation(open);
+    }
+    renderJournal();
+    renderStats();
+    console.log("Trades loaded from Firebase:", state.trades.length);
+  } catch(e) { console.warn("Firebase load trades:", e); }
+}
+
 </script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
 const _app = initializeApp({
   apiKey:"AIzaSyAOp7iCsYvbzBJlHD_Pni-8w1jaAagCGvU",
   authDomain:"quantum-trader-2bfb8.firebaseapp.com",
@@ -1881,14 +1938,21 @@ const _app = initializeApp({
   appId:"1:10367039371:web:98ab364add4459b103a18e"
 });
 const _auth = getAuth(_app);
+const _db   = getFirestore(_app);
+
 const _raw = sessionStorage.getItem("qt_session");
 if (!_raw) {
   window.location.href = "index.html";
 } else {
   const _u = JSON.parse(_raw);
+  // Expose globally for trades sync
+  window._fbDb      = _db;
+  window._fbSession = _u;
+
+  // Topbar
   const bar = document.createElement("div");
   bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(6,8,16,0.97);backdrop-filter:blur(12px);border-bottom:1px solid #1e2a3a;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;";
-  const adminLink = _u.role === "admin" ? '<a href="admin.html" style="font-family:monospace;font-size:9px;color:#ffd600;text-decoration:none;padding:5px 10px;border:1px solid rgba(255,214,0,0.3);border-radius:4px">ADMIN</a>' : "";
+  const adminLink = _u.role === "admin" ? `<a href="admin.html" style="font-family:monospace;font-size:9px;color:#ffd600;text-decoration:none;padding:5px 10px;border:1px solid rgba(255,214,0,0.3);border-radius:4px">ADMIN</a>` : "";
   bar.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:#ffd600">QUANTUM TRADER</span>
@@ -1897,15 +1961,24 @@ if (!_raw) {
     <div style="display:flex;align-items:center;gap:12px">
       <span style="font-family:monospace;font-size:10px;color:#4a5568">Hola, ${_u.name}</span>
       ${adminLink}
+      <a href="analyzer.html" style="font-family:monospace;font-size:9px;color:#00e5ff;text-decoration:none;padding:5px 10px;border:1px solid rgba(0,229,255,0.3);border-radius:4px">🔍 ANALIZAR CHART</a>
       <button id="_btnout" style="background:transparent;border:1px solid #1e2a3a;color:#4a5568;font-family:monospace;font-size:9px;padding:5px 10px;border-radius:4px;cursor:pointer">SALIR</button>
     </div>`;
   document.body.prepend(bar);
   document.body.style.paddingTop = "52px";
+
   document.getElementById("_btnout").onclick = async () => {
     await signOut(_auth);
     sessionStorage.removeItem("qt_session");
     window.location.href = "index.html";
   };
+
+  // Load trades from Firebase after page is ready
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      if (typeof loadTradesFromFirebase === "function") loadTradesFromFirebase();
+    }, 800);
+  });
 }
 </script>
 

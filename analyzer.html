@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analizador de Charts — Quantum Trader</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060810;--surface:#0d1117;--surface2:#111820;--border:#1e2a3a;
+  --gold:#ffd600;--gold2:#ffe580;--text:#e8edf5;--muted:#4a5568;
+  --green:#00ff88;--red:#ff3366;--cyan:#00e5ff;--purple:#7c3aed;
+  --fd:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fm:'Space Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;padding-top:52px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,214,0,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,214,0,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+
+/* TOPBAR */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(6,8,16,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;}
+.topbar-brand{display:flex;align-items:center;gap:10px;}
+.topbar-name{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--gold);}
+.topbar-badge{font-family:var(--fm);font-size:9px;letter-spacing:2px;background:rgba(0,229,255,.1);color:var(--cyan);padding:3px 8px;border-radius:4px;border:1px solid rgba(0,229,255,.2);}
+.topbar-links{display:flex;align-items:center;gap:10px;}
+.topbar-link{font-family:var(--fm);font-size:9px;color:var(--muted);text-decoration:none;padding:5px 10px;border:1px solid var(--border);border-radius:4px;transition:all .2s;cursor:pointer;}
+.topbar-link:hover,.topbar-link.active{color:var(--gold);border-color:rgba(255,214,0,.3);}
+.topbar-user{font-family:var(--fm);font-size:10px;color:var(--muted);}
+
+/* LAYOUT */
+.container{max-width:1100px;margin:0 auto;padding:32px 24px 80px;}
+.page-title{font-family:var(--fd);font-size:28px;font-weight:800;color:var(--gold);margin-bottom:6px;}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:32px;line-height:1.5;}
+
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+
+/* UPLOAD ZONE */
+.upload-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.panel-hdr{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:10px;}
+.panel-title{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;}
+.panel-title.gold{color:var(--gold);}
+.panel-title.cyan{color:var(--cyan);}
+.panel-body{padding:20px;}
+
+.drop-zone{border:2px dashed var(--border);border-radius:10px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .3s;position:relative;background:rgba(255,214,0,.01);}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--gold);background:rgba(255,214,0,.04);}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-icon{font-size:40px;margin-bottom:12px;display:block;}
+.drop-title{font-family:var(--fd);font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.drop-sub{font-size:12px;color:var(--muted);line-height:1.5;}
+
+.preview-img{width:100%;border-radius:8px;border:1px solid var(--border);margin-top:16px;display:none;max-height:320px;object-fit:contain;}
+
+/* CONTEXT */
+.context-section{margin-top:16px;}
+.context-label{font-family:var(--fm);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block;}
+.context-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+select,input[type=text]{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fb);font-size:13px;padding:9px 12px;outline:none;transition:border-color .2s;}
+select:focus,input[type=text]:focus{border-color:var(--gold);}
+option{background:var(--bg);}
+textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fb);font-size:13px;padding:9px 12px;outline:none;resize:vertical;min-height:70px;line-height:1.5;}
+textarea:focus{border-color:var(--gold);}
+
+.btn-analyze{width:100%;padding:14px;border:none;border-radius:8px;background:var(--gold);color:#000;font-family:var(--fd);font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .2s;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px;}
+.btn-analyze:hover{background:var(--gold2);box-shadow:0 0 24px rgba(255,214,0,.3);transform:translateY(-1px);}
+.btn-analyze:disabled{background:#1e2a3a;color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none;}
+
+/* THINKING */
+.thinking{display:none;text-align:center;padding:32px;border:1px solid rgba(0,229,255,.2);border-radius:10px;background:rgba(0,229,255,.03);margin-top:16px;}
+.thinking.show{display:block;}
+.thinking-icon{font-size:32px;animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.1);}}
+.thinking-text{font-family:var(--fm);font-size:11px;letter-spacing:2px;color:var(--cyan);margin-top:12px;}
+.thinking-steps{margin-top:16px;text-align:left;}
+.thinking-step{font-size:12px;color:var(--muted);padding:4px 0;display:flex;align-items:center;gap:8px;}
+.thinking-step.done{color:var(--green);}
+.thinking-step.active{color:var(--cyan);}
+
+/* RESULT PANEL */
+.result-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:none;}
+.result-panel.show{display:block;}
+
+.analysis-output{padding:20px;}
+
+/* SECTION BLOCKS */
+.analysis-section{margin-bottom:20px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.analysis-section-hdr{padding:10px 14px;background:var(--surface2);display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}
+.analysis-section-body{padding:14px;}
+.analysis-section-body p{font-size:13px;color:var(--text);line-height:1.7;margin-bottom:8px;}
+.analysis-section-body p:last-child{margin-bottom:0;}
+
+/* BIAS BADGE */
+.bias-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:6px;font-family:var(--fd);font-size:15px;font-weight:700;margin-bottom:16px;}
+.bias-badge.long{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--green);}
+.bias-badge.short{background:rgba(255,51,102,.1);border:1px solid rgba(255,51,102,.3);color:var(--red);}
+.bias-badge.neutral{background:rgba(255,214,0,.1);border:1px solid rgba(255,214,0,.3);color:var(--gold);}
+
+/* CHECKLIST */
+.checklist{display:flex;flex-direction:column;gap:6px;}
+.check-row{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;}
+.check-row.ok{background:rgba(0,255,136,.06);color:var(--green);}
+.check-row.warn{background:rgba(255,214,0,.06);color:var(--gold);}
+.check-row.no{background:rgba(255,51,102,.06);color:var(--red);}
+.check-icon{flex-shrink:0;font-size:14px;}
+
+/* NOTE OUTPUT */
+.note-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:var(--fm);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto;}
+
+/* ACTION BTNS */
+.action-row{display:flex;gap:10px;margin-top:16px;}
+.btn-copy{flex:1;padding:11px;border:1px solid rgba(0,229,255,.3);background:rgba(0,229,255,.06);color:var(--cyan);border-radius:6px;font-family:var(--fm);font-size:10px;letter-spacing:1px;cursor:pointer;transition:all .2s;}
+.btn-copy:hover{background:rgba(0,229,255,.15);}
+.btn-journal{flex:1;padding:11px;border:none;background:var(--gold);color:#000;border-radius:6px;font-family:var(--fm);font-size:10px;letter-spacing:1px;cursor:pointer;font-weight:700;transition:all .2s;}
+.btn-journal:hover{background:var(--gold2);}
+.btn-new{flex:1;padding:11px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;font-family:var(--fm);font-size:10px;letter-spacing:1px;cursor:pointer;transition:all .2s;}
+.btn-new:hover{border-color:var(--gold);color:var(--gold);}
+
+/* HISTORY */
+.history-section{margin-top:20px;}
+.history-title{font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
+.history-list{display:flex;flex-direction:column;gap:8px;}
+.history-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:space-between;}
+.history-item:hover{border-color:rgba(255,214,0,.3);}
+.history-item-left{flex:1;}
+.history-item-pair{font-family:var(--fm);font-size:11px;color:var(--gold);margin-bottom:2px;}
+.history-item-date{font-size:11px;color:var(--muted);}
+.history-item-bias{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:4px;}
+.history-item-bias.long{background:rgba(0,255,136,.1);color:var(--green);}
+.history-item-bias.short{background:rgba(255,51,102,.1);color:var(--red);}
+.history-item-bias.neutral{background:rgba(255,214,0,.1);color:var(--gold);}
+
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <span class="topbar-name">QUANTUM TRADER</span>
+    <span class="topbar-badge">🔍 ANALIZADOR SMC</span>
+  </div>
+  <div class="topbar-links">
+    <a href="app.html" class="topbar-link">← JOURNAL</a>
+    <span class="topbar-user" id="tb-user"></span>
+    <button class="topbar-link" id="btn-logout">SALIR</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="page-title">Analizador de Charts IA</div>
+  <div class="page-sub">Sube una captura de TradingView y la IA interpreta la estructura de mercado, zonas, setups y genera la nota de análisis completa lista para el journal.</div>
+
+  <div class="main-grid">
+
+    <!-- LEFT: UPLOAD -->
+    <div>
+      <div class="upload-panel">
+        <div class="panel-hdr">
+          <span class="panel-title gold">📸 IMAGEN DEL CHART</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" id="file-input" accept="image/*">
+            <span class="drop-icon">📊</span>
+            <div class="drop-title">Arrastra tu captura de TradingView</div>
+            <div class="drop-sub">O click para seleccionar la imagen<br>Formatos: PNG, JPG, WebP</div>
+          </div>
+          <img id="preview" class="preview-img" alt="Preview">
+
+          <div class="context-section">
+            <span class="context-label">Contexto del análisis</span>
+            <div class="context-row">
+              <select id="ctx-pair">
+                <option value="">Par / Instrumento</option>
+                <option value="BTC/USDT">BTC/USDT</option>
+                <option value="ETH/USDT">ETH/USDT</option>
+                <option value="EUR/USD">EUR/USD</option>
+                <option value="GBP/USD">GBP/USD</option>
+                <option value="XAU/USD">XAU/USD (Oro)</option>
+                <option value="NAS100">NAS100</option>
+                <option value="SPX500">SPX500</option>
+                <option value="otro">Otro</option>
+              </select>
+              <select id="ctx-tf">
+                <option value="">Temporalidad</option>
+                <option value="M1">M1</option>
+                <option value="M5">M5</option>
+                <option value="M15">M15 (Entrada)</option>
+                <option value="H1">H1</option>
+                <option value="H4">H4 (Contexto)</option>
+                <option value="D1">D1</option>
+                <option value="W1">W1</option>
+              </select>
+            </div>
+            <div class="context-row">
+              <select id="ctx-session">
+                <option value="">Sesión de trading</option>
+                <option value="Sesión Asiática">Sesión Asiática</option>
+                <option value="Sesión Londres">Sesión Londres</option>
+                <option value="Sesión Nueva York">Sesión Nueva York</option>
+                <option value="Overlap Londres/NY">Overlap Londres/NY</option>
+              </select>
+              <select id="ctx-type">
+                <option value="">Tipo de análisis</option>
+                <option value="Análisis de contexto superior">Contexto Superior</option>
+                <option value="Búsqueda de entrada">Búsqueda de Entrada</option>
+                <option value="Análisis post-trade">Post-Trade</option>
+                <option value="Análisis de zona clave">Zona Clave</option>
+              </select>
+            </div>
+            <textarea id="ctx-notes" placeholder="Notas adicionales (opcional): ej. 'precio llegó desde zona premium', 'confirmé BOS en H4 primero'..."></textarea>
+          </div>
+
+          <button class="btn-analyze" id="btn-analyze" onclick="analyzeChart()" disabled>
+            <span>🔍</span> ANALIZAR CON IA
+          </button>
+
+          <div class="thinking" id="thinking">
+            <div class="thinking-icon">🧠</div>
+            <div class="thinking-text">ANALIZANDO ESTRUCTURA DE MERCADO...</div>
+            <div class="thinking-steps" id="thinking-steps"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="history-section" id="history-section" style="display:none">
+        <div class="history-title">Análisis Recientes</div>
+        <div class="history-list" id="history-list"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: RESULT -->
+    <div>
+      <div class="result-panel" id="result-panel">
+        <div class="panel-hdr">
+          <span class="panel-title cyan">📋 ANÁLISIS COMPLETO</span>
+        </div>
+        <div class="analysis-output" id="analysis-output"></div>
+      </div>
+
+      <!-- Placeholder when no analysis yet -->
+      <div id="placeholder" style="background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:60px 32px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;opacity:.3">🔍</div>
+        <div style="font-family:var(--fd);font-size:16px;color:var(--muted);margin-bottom:8px">El análisis aparecerá aquí</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Sube una imagen del chart, selecciona el contexto<br>y presiona <strong style="color:var(--gold)">ANALIZAR CON IA</strong></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// AUTH CHECK
+// ═══════════════════════════════════════════════
+const _raw = sessionStorage.getItem("qt_session");
+if (!_raw) { window.location.href = "index.html"; }
+const _u = JSON.parse(_raw || "{}");
+document.getElementById("tb-user").textContent = _u.name || "";
+document.getElementById("btn-logout").onclick = () => {
+  sessionStorage.removeItem("qt_session");
+  window.location.href = "index.html";
+};
+
+// ═══════════════════════════════════════════════
+// UPLOAD LOGIC
+// ═══════════════════════════════════════════════
+let currentImageBase64 = null;
+let analysisHistory = JSON.parse(localStorage.getItem("qt_analysis_history") || "[]");
+
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+const preview   = document.getElementById("preview");
+const btnAnalyze = document.getElementById("btn-analyze");
+
+fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64 = e.target.result;
+    currentImageBase64 = base64.split(",")[1];
+    preview.src = base64;
+    preview.style.display = "block";
+    btnAnalyze.disabled = false;
+    dropZone.querySelector(".drop-title").textContent = "✓ Imagen cargada";
+    dropZone.querySelector(".drop-sub").textContent = file.name + " — Click para cambiar";
+  };
+  reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════
+// ANALYSIS
+// ═══════════════════════════════════════════════
+async function analyzeChart() {
+  if (!currentImageBase64) return;
+
+  const pair    = document.getElementById("ctx-pair").value;
+  const tf      = document.getElementById("ctx-tf").value;
+  const session = document.getElementById("ctx-session").value;
+  const type    = document.getElementById("ctx-type").value;
+  const notes   = document.getElementById("ctx-notes").value;
+
+  // Show thinking
+  btnAnalyze.disabled = true;
+  document.getElementById("placeholder").style.display = "none";
+  document.getElementById("result-panel").classList.remove("show");
+  const thinking = document.getElementById("thinking");
+  thinking.classList.add("show");
+
+  const steps = [
+    "Identificando estructura de mercado...",
+    "Detectando BOS y CHoCH...",
+    "Mapeando Order Blocks y zonas de liquidez...",
+    "Analizando niveles Fibonacci...",
+    "Evaluando sesgo direccional...",
+    "Detectando setup específico...",
+    "Completando checklist pre-entrada...",
+    "Redactando nota de análisis...",
+  ];
+
+  const stepsEl = document.getElementById("thinking-steps");
+  stepsEl.innerHTML = steps.map(s => `<div class="thinking-step">⏳ ${s}</div>`).join("");
+  const stepEls = stepsEl.querySelectorAll(".thinking-step");
+
+  let stepIdx = 0;
+  const stepInterval = setInterval(() => {
+    if (stepIdx > 0) stepEls[stepIdx-1].className = "thinking-step done";
+    if (stepIdx < stepEls.length) {
+      stepEls[stepIdx].className = "thinking-step active";
+      stepIdx++;
+    }
+  }, 700);
+
+  // Build prompt
+  const contextInfo = [
+    pair    ? `Par/Instrumento: ${pair}` : "",
+    tf      ? `Temporalidad: ${tf}` : "",
+    session ? `Sesión: ${session}` : "",
+    type    ? `Tipo: ${type}` : "",
+    notes   ? `Notas del trader: ${notes}` : "",
+  ].filter(Boolean).join("\n");
+
+  const systemPrompt = `Eres un analista experto en Smart Money Concepts (SMC) con dominio profundo de:
+- BOS (Break of Structure) y CHoCH (Change of Character)
+- Order Blocks (OB) alcistas y bajistas
+- Imbalances / Fair Value Gaps (FVG)
+- Zonas premium y discount (Fibonacci 0-100%, óptima 70-100% oferta / 0-50% demanda)
+- Fibonacci invertido: niveles 100%, 78.6%, 70%, 50%, 0%
+- Liquidez: Equal Highs/Lows, Stop Hunts, Liquidity Sweeps
+- Break Blocks (BB) y Last Blocks (LB)
+- Estructura de mercado en múltiples temporalidades
+- Sesgo institucional y Smart Money vs Retail
+- Setups de alta probabilidad: OB + FVG + BOS alineados
+
+Tu tarea: Analizar la imagen del chart y generar un análisis técnico completo y estructurado.
+
+IMPORTANTE: Responde SIEMPRE en JSON válido con esta estructura exacta:
+{
+  "sesgo": "long" | "short" | "neutral",
+  "confianza": 1-10,
+  "estructura": {
+    "temporalidad": "descripción de la estructura",
+    "ultimo_bos": "descripción del último BOS/CHoCH observado",
+    "tendencia": "descripción de la tendencia"
+  },
+  "zonas": {
+    "demanda": "descripción de zonas de demanda identificadas",
+    "oferta": "descripción de zonas de oferta identificadas",
+    "orderblocks": "descripción de OBs visibles"
+  },
+  "fibonacci": {
+    "niveles": "descripción de niveles Fibonacci visibles",
+    "zona_optima": "zona de entrada óptima identificada"
+  },
+  "liquidez": "descripción de zonas de liquidez, equal highs/lows, stop hunts",
+  "setup": {
+    "tipo": "nombre del setup (ej: OB+BOS, CHoCH+FVG, etc)",
+    "descripcion": "descripción detallada del setup",
+    "entrada": "nivel o zona de entrada sugerida",
+    "sl": "nivel de SL sugerido y justificación",
+    "tp": "nivel de TP sugerido y justificación"
+  },
+  "checklist": [
+    {"criterio": "BOS/CHoCH confirmado con cuerpo de vela", "estado": "ok|warn|no", "detalle": "explicación"},
+    {"criterio": "Zona premium/discount confirmada", "estado": "ok|warn|no", "detalle": "explicación"},
+    {"criterio": "Order Block identificado con 2+ reacciones", "estado": "ok|warn|no", "detalle": "explicación"},
+    {"criterio": "Alineamiento multi-temporalidad", "estado": "ok|warn|no", "detalle": "explicación"},
+    {"criterio": "Liquidez barrida antes de entrada", "estado": "ok|warn|no", "detalle": "explicación"},
+    {"criterio": "Fibonacci en zona óptima", "estado": "ok|warn|no", "detalle": "explicación"},
+    {"criterio": "Sin noticias de alto impacto próximas", "estado": "warn", "detalle": "Verificar calendario económico"},
+    {"criterio": "Setup A+ sin ambigüedad", "estado": "ok|warn|no", "detalle": "explicación"}
+  ],
+  "nota_analisis": "Nota completa y detallada para el journal, párrafo de 150-250 palabras describiendo todo lo observado en el chart en primera persona como si el trader la escribiera",
+  "observaciones": "Advertencias, confluencias adicionales o puntos de atención importantes"
+}`;
+
+  const userPrompt = `Analiza este chart de trading.${contextInfo ? "\n\nContexto proporcionado:\n" + contextInfo : ""}\n\nGenera el análisis completo en JSON.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/png", data: currentImageBase64 } },
+            { type: "text", text: userPrompt }
+          ]
+        }]
+      })
+    });
+
+    clearInterval(stepInterval);
+    stepEls.forEach(el => el.className = "thinking-step done");
+
+    const data = await response.json();
+    const rawText = data.content?.[0]?.text || "";
+
+    let analysis;
+    try {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      analysis = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
+    } catch(e) {
+      throw new Error("No pude parsear la respuesta: " + rawText.substring(0, 200));
+    }
+
+    setTimeout(() => {
+      thinking.classList.remove("show");
+      renderAnalysis(analysis, pair, tf);
+      saveToHistory(analysis, pair, tf);
+    }, 500);
+
+  } catch(err) {
+    clearInterval(stepInterval);
+    thinking.classList.remove("show");
+    btnAnalyze.disabled = false;
+    document.getElementById("placeholder").style.display = "block";
+    document.getElementById("placeholder").innerHTML = `
+      <div style="font-size:32px;margin-bottom:12px">❌</div>
+      <div style="font-family:var(--fd);color:var(--red);margin-bottom:8px">Error en el análisis</div>
+      <div style="font-size:12px;color:var(--muted)">${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// RENDER ANALYSIS
+// ═══════════════════════════════════════════════
+function renderAnalysis(a, pair, tf) {
+  const biasLabel = a.sesgo === "long" ? "▲ LARGO — ALCISTA" : a.sesgo === "short" ? "▼ CORTO — BAJISTA" : "◆ NEUTRAL — SIN SESGO";
+  const biasClass = a.sesgo === "long" ? "long" : a.sesgo === "short" ? "short" : "neutral";
+
+  const checkIcons = { ok: "✅", warn: "⚠️", no: "❌" };
+  const checkClasses = { ok: "ok", warn: "warn", no: "no" };
+
+  const checklistHtml = (a.checklist || []).map(c => `
+    <div class="check-row ${checkClasses[c.estado] || 'warn'}">
+      <span class="check-icon">${checkIcons[c.estado] || '⚠️'}</span>
+      <div><strong>${c.criterio}</strong>${c.detalle ? `<div style="font-size:11px;opacity:.8;margin-top:2px">${c.detalle}</div>` : ""}</div>
+    </div>`).join("");
+
+  const confColor = a.confianza >= 8 ? "var(--green)" : a.confianza >= 6 ? "var(--gold)" : "var(--red)";
+
+  document.getElementById("analysis-output").innerHTML = `
+
+    <!-- HEADER -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="bias-badge ${biasClass}">${biasLabel}</div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        ${pair ? `<span style="font-family:var(--fm);font-size:11px;color:var(--muted)">${pair}</span>` : ""}
+        ${tf ? `<span style="font-family:var(--fm);font-size:11px;color:var(--muted)">${tf}</span>` : ""}
+        <span style="font-family:var(--fm);font-size:11px;color:${confColor}">Confianza: ${a.confianza}/10</span>
+      </div>
+    </div>
+
+    <!-- ESTRUCTURA -->
+    <div class="analysis-section">
+      <div class="analysis-section-hdr" style="color:var(--gold)">📈 ESTRUCTURA DE MERCADO</div>
+      <div class="analysis-section-body">
+        ${a.estructura?.tendencia ? `<p><strong>Tendencia:</strong> ${a.estructura.tendencia}</p>` : ""}
+        ${a.estructura?.ultimo_bos ? `<p><strong>Último BOS/CHoCH:</strong> ${a.estructura.ultimo_bos}</p>` : ""}
+        ${a.estructura?.temporalidad ? `<p>${a.estructura.temporalidad}</p>` : ""}
+      </div>
+    </div>
+
+    <!-- ZONAS -->
+    <div class="analysis-section">
+      <div class="analysis-section-hdr" style="color:var(--cyan)">🎯 ORDER BLOCKS & ZONAS</div>
+      <div class="analysis-section-body">
+        ${a.zonas?.orderblocks ? `<p><strong>Order Blocks:</strong> ${a.zonas.orderblocks}</p>` : ""}
+        ${a.zonas?.demanda ? `<p><strong>Zonas de Demanda:</strong> ${a.zonas.demanda}</p>` : ""}
+        ${a.zonas?.oferta ? `<p><strong>Zonas de Oferta:</strong> ${a.zonas.oferta}</p>` : ""}
+        ${a.liquidez ? `<p><strong>Liquidez:</strong> ${a.liquidez}</p>` : ""}
+      </div>
+    </div>
+
+    <!-- FIBONACCI -->
+    <div class="analysis-section">
+      <div class="analysis-section-hdr" style="color:var(--purple)">📐 FIBONACCI</div>
+      <div class="analysis-section-body">
+        ${a.fibonacci?.niveles ? `<p>${a.fibonacci.niveles}</p>` : ""}
+        ${a.fibonacci?.zona_optima ? `<p><strong>Zona Óptima:</strong> ${a.fibonacci.zona_optima}</p>` : ""}
+      </div>
+    </div>
+
+    <!-- SETUP -->
+    <div class="analysis-section">
+      <div class="analysis-section-hdr" style="color:var(--green)">⚡ SETUP DETECTADO</div>
+      <div class="analysis-section-body">
+        ${a.setup?.tipo ? `<p><strong style="color:var(--green)">${a.setup.tipo}</strong></p>` : ""}
+        ${a.setup?.descripcion ? `<p>${a.setup.descripcion}</p>` : ""}
+        ${a.setup?.entrada ? `<p><strong>Entrada:</strong> ${a.setup.entrada}</p>` : ""}
+        ${a.setup?.sl ? `<p><strong>SL Sugerido:</strong> ${a.setup.sl}</p>` : ""}
+        ${a.setup?.tp ? `<p><strong>TP Sugerido:</strong> ${a.setup.tp}</p>` : ""}
+      </div>
+    </div>
+
+    <!-- CHECKLIST -->
+    <div class="analysis-section">
+      <div class="analysis-section-hdr" style="color:var(--gold)">✅ CHECKLIST PRE-ENTRADA</div>
+      <div class="analysis-section-body">
+        <div class="checklist">${checklistHtml}</div>
+      </div>
+    </div>
+
+    <!-- NOTA PARA JOURNAL -->
+    <div class="analysis-section">
+      <div class="analysis-section-hdr" style="color:var(--cyan)">📝 NOTA PARA EL JOURNAL</div>
+      <div class="analysis-section-body">
+        <div class="note-box" id="nota-text">${a.nota_analisis || ""}</div>
+        ${a.observaciones ? `<p style="margin-top:12px;font-size:12px;color:var(--gold);padding:10px;background:rgba(255,214,0,0.05);border-radius:6px;border-left:3px solid var(--gold)">⚠️ ${a.observaciones}</p>` : ""}
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="action-row">
+      <button class="btn-copy" onclick="copyNota()">📋 COPIAR NOTA</button>
+      <button class="btn-journal" onclick="irAlJournal()">→ IR AL JOURNAL</button>
+      <button class="btn-new" onclick="resetAnalyzer()">+ NUEVO ANÁLISIS</button>
+    </div>
+  `;
+
+  // Store nota for copy
+  window._lastNota = a.nota_analisis;
+  window._lastAnalysis = a;
+
+  document.getElementById("result-panel").classList.add("show");
+  btnAnalyze.disabled = false;
+}
+
+function copyNota() {
+  const nota = document.getElementById("nota-text")?.textContent || "";
+  navigator.clipboard.writeText(nota).then(() => {
+    const btn = document.querySelector(".btn-copy");
+    btn.textContent = "✅ COPIADA";
+    setTimeout(() => btn.textContent = "📋 COPIAR NOTA", 2000);
+  });
+}
+
+function irAlJournal() {
+  if (window._lastNota) sessionStorage.setItem("qt_nota_analisis", window._lastNota);
+  window.location.href = "app.html";
+}
+
+function resetAnalyzer() {
+  currentImageBase64 = null;
+  document.getElementById("preview").style.display = "none";
+  document.getElementById("file-input").value = "";
+  document.getElementById("result-panel").classList.remove("show");
+  document.getElementById("placeholder").style.display = "block";
+  document.getElementById("placeholder").innerHTML = `
+    <div style="font-size:48px;margin-bottom:16px;opacity:.3">🔍</div>
+    <div style="font-family:var(--fd);font-size:16px;color:var(--muted);margin-bottom:8px">El análisis aparecerá aquí</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6">Sube una imagen del chart, selecciona el contexto<br>y presiona <strong style="color:var(--gold)">ANALIZAR CON IA</strong></div>`;
+  btnAnalyze.disabled = true;
+  dropZone.querySelector(".drop-title").textContent = "Arrastra tu captura de TradingView";
+  dropZone.querySelector(".drop-sub").textContent = "O click para seleccionar la imagen\nFormatos: PNG, JPG, WebP";
+}
+
+// ═══════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════
+function saveToHistory(analysis, pair, tf) {
+  const entry = {
+    id: Date.now(),
+    date: new Date().toLocaleString("es", {day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}),
+    pair: pair || "Sin par",
+    tf: tf || "",
+    sesgo: analysis.sesgo,
+    confianza: analysis.confianza,
+    setup: analysis.setup?.tipo || "—",
+    nota: analysis.nota_analisis,
+    data: analysis
+  };
+  analysisHistory.unshift(entry);
+  if (analysisHistory.length > 20) analysisHistory.pop();
+  localStorage.setItem("qt_analysis_history", JSON.stringify(analysisHistory));
+  renderHistory();
+}
+
+function renderHistory() {
+  if (analysisHistory.length === 0) return;
+  const section = document.getElementById("history-section");
+  const list    = document.getElementById("history-list");
+  section.style.display = "block";
+  list.innerHTML = analysisHistory.slice(0, 5).map(h => `
+    <div class="history-item" onclick="loadHistory(${h.id})">
+      <div class="history-item-left">
+        <div class="history-item-pair">${h.pair} ${h.tf ? "· "+h.tf : ""}</div>
+        <div class="history-item-date">${h.date} · ${h.setup}</div>
+      </div>
+      <span class="history-item-bias ${h.sesgo}">${h.sesgo === "long" ? "▲ LONG" : h.sesgo === "short" ? "▼ SHORT" : "◆ NEUTRAL"}</span>
+    </div>`).join("");
+}
+
+function loadHistory(id) {
+  const entry = analysisHistory.find(h => h.id === id);
+  if (!entry) return;
+  document.getElementById("placeholder").style.display = "none";
+  renderAnalysis(entry.data, entry.pair, entry.tf);
+}
+
+// Init history on load
+renderHistory();
+</script>
+</body>
+</html>
