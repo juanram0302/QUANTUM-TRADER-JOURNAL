@@ -141,7 +141,28 @@ textarea:focus{border-color:var(--gold);}
   <div class="topbar-links">
     <a href="app.html" class="topbar-link">← JOURNAL</a>
     <span class="topbar-user" id="tb-user"></span>
+    <button class="topbar-link" id="btn-apikey" onclick="showApiKeyModal()" style="color:var(--cyan);border-color:rgba(0,229,255,0.3);">⚙️ API KEY</button>
     <button class="topbar-link" id="btn-logout">SALIR</button>
+  </div>
+</div>
+
+<!-- API KEY MODAL -->
+<div id="modal-apikey" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;padding:32px;max-width:500px;width:90%;">
+    <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:700;color:#ffd600;margin-bottom:8px;">⚙️ Configurar API Key</div>
+    <div style="font-size:13px;color:#4a5568;margin-bottom:20px;line-height:1.6;">
+      Para usar el analizador necesitas una API Key de Anthropic.<br>
+      <a href="https://console.anthropic.com/keys" target="_blank" style="color:#00e5ff;">Obtén tu API Key aquí →</a><br><br>
+      <strong style="color:#ffd600;">La key se guarda solo en tu navegador, nadie más la ve.</strong>
+    </div>
+    <div style="font-family:monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:6px;">Tu API Key</div>
+    <input type="password" id="apikey-input" placeholder="sk-ant-api03-..." 
+      style="width:100%;background:#060810;border:1px solid #1e2a3a;border-radius:6px;color:#e8edf5;font-family:monospace;font-size:13px;padding:11px 14px;outline:none;margin-bottom:16px;">
+    <div style="display:flex;gap:10px;">
+      <button onclick="saveApiKey()" style="flex:1;padding:12px;border:none;border-radius:6px;background:#ffd600;color:#000;font-family:Syne,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">GUARDAR</button>
+      <button onclick="closeApiKeyModal()" style="flex:1;padding:12px;border:1px solid #1e2a3a;border-radius:6px;background:transparent;color:#4a5568;font-family:monospace;font-size:11px;cursor:pointer;">CANCELAR</button>
+    </div>
+    <div id="apikey-status" style="margin-top:12px;font-size:12px;display:none;"></div>
   </div>
 </div>
 
@@ -409,9 +430,23 @@ IMPORTANTE: Responde SIEMPRE en JSON válido con esta estructura exacta:
   const userPrompt = `Analiza este chart de trading.${contextInfo ? "\n\nContexto proporcionado:\n" + contextInfo : ""}\n\nGenera el análisis completo en JSON.`;
 
   try {
+    // Detect image type from base64 header
+    const imgType = currentImageBase64.startsWith("/9j/") ? "image/jpeg" :
+                    currentImageBase64.startsWith("iVBOR") ? "image/png" :
+                    currentImageBase64.startsWith("UklGR") ? "image/webp" : "image/png";
+
+    // Direct Anthropic API call with user's key
+    const apiKey = localStorage.getItem("qt_apikey") || "";
+    if (!apiKey) { throw new Error("Necesitas configurar tu API Key de Anthropic. Click en ⚙️ CONFIGURAR API KEY arriba."); }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-calls": "true",
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2000,
@@ -419,12 +454,17 @@ IMPORTANTE: Responde SIEMPRE en JSON válido con esta estructura exacta:
         messages: [{
           role: "user",
           content: [
-            { type: "image", source: { type: "base64", media_type: "image/png", data: currentImageBase64 } },
+            { type: "image", source: { type: "base64", media_type: imgType, data: currentImageBase64 } },
             { type: "text", text: userPrompt }
           ]
         }]
       })
     });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error("API Error " + response.status + ": " + errText.substring(0, 200));
+    }
 
     clearInterval(stepInterval);
     stepEls.forEach(el => el.className = "thinking-step done");
@@ -637,6 +677,45 @@ function loadHistory(id) {
 
 // Init history on load
 renderHistory();
+
+// ═══════════════════════════════════
+// API KEY MANAGEMENT
+// ═══════════════════════════════════
+function showApiKeyModal() {
+  const saved = localStorage.getItem("qt_apikey") || "";
+  document.getElementById("apikey-input").value = saved ? "sk-ant-••••••••••••••••" : "";
+  document.getElementById("modal-apikey").style.display = "flex";
+}
+function closeApiKeyModal() {
+  document.getElementById("modal-apikey").style.display = "none";
+}
+function saveApiKey() {
+  const val = document.getElementById("apikey-input").value.trim();
+  if (!val || val.includes("••")) { 
+    if (localStorage.getItem("qt_apikey")) { closeApiKeyModal(); return; }
+    document.getElementById("apikey-status").style.display = "block";
+    document.getElementById("apikey-status").style.color = "var(--red)";
+    document.getElementById("apikey-status").textContent = "Ingresa tu API Key.";
+    return;
+  }
+  localStorage.setItem("qt_apikey", val);
+  const btn = document.getElementById("btn-apikey");
+  btn.textContent = "✅ API KEY";
+  btn.style.color = "var(--green)";
+  const status = document.getElementById("apikey-status");
+  status.style.display = "block";
+  status.style.color = "var(--green)";
+  status.textContent = "✅ API Key guardada correctamente.";
+  setTimeout(closeApiKeyModal, 1500);
+}
+// Check if API key exists on load
+window.addEventListener("load", () => {
+  if (localStorage.getItem("qt_apikey")) {
+    const btn = document.getElementById("btn-apikey");
+    if (btn) { btn.textContent = "✅ API KEY"; btn.style.color = "var(--green)"; }
+  }
+});
+
 </script>
 </body>
 </html>
