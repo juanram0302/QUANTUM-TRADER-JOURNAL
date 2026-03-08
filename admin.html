@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — Quantum Trader</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#060810;--surface:#0d1117;--surface2:#111820;--border:#1e2a3a;
+    --gold:#ffd600;--gold2:#ffe580;--text:#e8edf5;--muted:#4a5568;--muted2:#2d3748;
+    --green:#00ff88;--red:#ff3366;--yellow:#ffd600;--orange:#ff6b35;--cyan:#00e5ff;
+    --fd:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fm:'Space Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,214,0,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,214,0,0.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+
+  .topbar{position:sticky;top:0;z-index:100;background:rgba(6,8,16,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:60px;}
+  .topbar-left{display:flex;align-items:center;gap:16px;}
+  .topbar-logo{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--gold);}
+  .topbar-badge{font-family:var(--fm);font-size:9px;letter-spacing:2px;background:rgba(255,214,0,0.12);color:var(--gold);padding:3px 8px;border-radius:4px;border:1px solid rgba(255,214,0,0.3);}
+  .topbar-right{display:flex;align-items:center;gap:16px;}
+  .topbar-user{font-family:var(--fm);font-size:10px;color:var(--muted);}
+  .btn-logout{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:6px 12px;border-radius:4px;cursor:pointer;transition:all .2s;}
+  .btn-logout:hover{border-color:var(--red);color:var(--red);}
+
+  .container{max-width:1200px;margin:0 auto;padding:32px 24px 80px;}
+
+  /* STATS */
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px;}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;position:relative;overflow:hidden;}
+  .stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .stat.gold::before{background:var(--gold);}
+  .stat.green::before{background:var(--green);}
+  .stat.yellow::before{background:var(--yellow);}
+  .stat.red::before{background:var(--red);}
+  .stat-label{font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+  .stat-val{font-family:var(--fd);font-size:32px;font-weight:700;}
+  .stat.gold .stat-val{color:var(--gold);}
+  .stat.green .stat-val{color:var(--green);}
+  .stat.yellow .stat-val{color:var(--yellow);}
+  .stat.red .stat-val{color:var(--red);}
+
+  /* PANEL */
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;}
+  .panel-header{padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;}
+  .panel-title{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);}
+
+  /* TABS */
+  .tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:8px;margin-bottom:24px;}
+  .tab{flex:1;padding:9px;border:none;background:transparent;color:var(--muted);font-family:var(--fm);font-size:10px;letter-spacing:1px;text-transform:uppercase;border-radius:6px;cursor:pointer;transition:all .2s;}
+  .tab.active{background:#1a1400;color:var(--gold);}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+
+  /* USER TABLE */
+  .user-table{width:100%;border-collapse:collapse;}
+  .user-table th{font-family:var(--fm);font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2);}
+  .user-table td{padding:14px;border-bottom:1px solid rgba(30,42,58,0.5);font-size:13px;vertical-align:middle;}
+  .user-table tr:last-child td{border-bottom:none;}
+  .user-table tr:hover td{background:rgba(255,214,0,0.02);}
+
+  .status-badge{display:inline-flex;padding:3px 9px;border-radius:4px;font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+  .status-badge.pending{background:rgba(255,214,0,0.12);color:var(--yellow);border:1px solid rgba(255,214,0,0.3);}
+  .status-badge.approved{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.3);}
+  .status-badge.rejected{background:rgba(255,51,102,0.1);color:var(--red);border:1px solid rgba(255,51,102,0.3);}
+
+  .action-btns{display:flex;gap:6px;}
+  .btn-sm{padding:5px 10px;border-radius:4px;font-family:var(--fm);font-size:9px;letter-spacing:1px;cursor:pointer;border:1px solid;transition:all .2s;white-space:nowrap;}
+  .btn-approve{background:rgba(0,255,136,0.08);color:var(--green);border-color:rgba(0,255,136,0.3);}
+  .btn-approve:hover{background:rgba(0,255,136,0.2);}
+  .btn-reject{background:rgba(255,51,102,0.08);color:var(--red);border-color:rgba(255,51,102,0.3);}
+  .btn-reject:hover{background:rgba(255,51,102,0.2);}
+  .btn-delete{background:transparent;color:var(--muted);border-color:var(--border);}
+  .btn-delete:hover{color:var(--red);border-color:var(--red);}
+  .btn-view{background:rgba(0,229,255,0.08);color:var(--cyan);border-color:rgba(0,229,255,0.3);}
+
+  .user-name{font-weight:500;color:var(--text);}
+  .user-email{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+  .user-date{font-family:var(--fm);font-size:10px;color:var(--muted);}
+
+  .notes-input{background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--fb);font-size:12px;padding:5px 8px;width:160px;outline:none;}
+  .notes-input:focus{border-color:var(--gold);}
+
+  .empty-state{text-align:center;padding:48px;color:var(--muted);font-size:13px;}
+  .empty-icon{font-size:32px;opacity:.3;display:block;margin-bottom:12px;}
+
+  /* NOTIFICATION */
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 20px;font-family:var(--fm);font-size:11px;color:var(--text);transform:translateY(80px);opacity:0;transition:all .3s;z-index:999;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.ok{border-color:rgba(0,255,136,0.4);color:var(--green);}
+  .toast.err{border-color:rgba(255,51,102,0.4);color:var(--red);}
+
+  /* MODAL */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+  .modal.show{display:flex;}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;max-width:480px;width:90%;}
+  .modal-title{font-family:var(--fd);font-size:18px;font-weight:700;color:var(--gold);margin-bottom:8px;}
+  .modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5;}
+  .modal-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(30,42,58,0.5);font-size:13px;}
+  .modal-row:last-of-type{border:none;}
+  .modal-label{color:var(--muted);}
+  .modal-val{color:var(--text);font-family:var(--fm);font-size:11px;}
+  .modal-close{width:100%;padding:12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;margin-top:16px;transition:all .2s;}
+  .modal-close:hover{border-color:var(--gold);color:var(--gold);}
+
+  @media(max-width:768px){
+    .stats-grid{grid-template-columns:repeat(2,1fr);}
+    .user-table{font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">QUANTUM TRADER</span>
+    <span class="topbar-badge">ADMIN PANEL</span>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="admin-name">Admin</span>
+    <button class="btn-logout" onclick="AUTH.logout()">CERRAR SESIÓN</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat gold">
+      <div class="stat-label">Total Usuarios</div>
+      <div class="stat-val" id="s-total">0</div>
+    </div>
+    <div class="stat yellow">
+      <div class="stat-label">Pendientes</div>
+      <div class="stat-val" id="s-pending">0</div>
+    </div>
+    <div class="stat green">
+      <div class="stat-label">Aprobados</div>
+      <div class="stat-val" id="s-approved">0</div>
+    </div>
+    <div class="stat red">
+      <div class="stat-label">Rechazados</div>
+      <div class="stat-val" id="s-rejected">0</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('pending')">⏳ Pendientes</button>
+    <button class="tab" onclick="switchTab('approved')">✅ Aprobados</button>
+    <button class="tab" onclick="switchTab('rejected')">❌ Rechazados</button>
+    <button class="tab" onclick="switchTab('all')">👥 Todos</button>
+  </div>
+
+  <!-- PENDING -->
+  <div class="tab-content active" id="tab-pending">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Solicitudes Pendientes de Aprobación</span>
+        <span id="pending-count" style="font-family:var(--fm);font-size:10px;color:var(--muted)">0 solicitudes</span>
+      </div>
+      <table class="user-table">
+        <thead><tr>
+          <th>Usuario</th>
+          <th>Registro</th>
+          <th>Términos</th>
+          <th>Notas Admin</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody id="tbody-pending"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- APPROVED -->
+  <div class="tab-content" id="tab-approved">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Usuarios Aprobados</span>
+      </div>
+      <table class="user-table">
+        <thead><tr>
+          <th>Usuario</th>
+          <th>Aprobado</th>
+          <th>Último Login</th>
+          <th>Trades</th>
+          <th>Notas</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody id="tbody-approved"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- REJECTED -->
+  <div class="tab-content" id="tab-rejected">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Usuarios Rechazados</span>
+      </div>
+      <table class="user-table">
+        <thead><tr>
+          <th>Usuario</th>
+          <th>Fecha</th>
+          <th>Notas</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody id="tbody-rejected"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ALL -->
+  <div class="tab-content" id="tab-all">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Todos los Usuarios</span>
+      </div>
+      <table class="user-table">
+        <thead><tr>
+          <th>Usuario</th>
+          <th>Estado</th>
+          <th>Registro</th>
+          <th>Trades</th>
+          <th>Acciones</th>
+        </tr></thead>
+        <tbody id="tbody-all"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- USER DETAIL MODAL -->
+<div class="modal" id="modal-user">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-name">Usuario</div>
+    <div class="modal-sub" id="modal-email"></div>
+    <div id="modal-rows"></div>
+    <button class="modal-close" onclick="closeModal()">Cerrar</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="auth.js"></script>
+<script src="db.js"></script>
+<script>
+  // Auth check
+  const session = AUTH.requireAuth(true);
+  if (session) document.getElementById('admin-name').textContent = session.name;
+
+  function fmt(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('es', {day:'2-digit',month:'short',year:'numeric'});
+  }
+
+  function toast(msg, type='ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show ' + type;
+    setTimeout(() => el.className = 'toast', 2500);
+  }
+
+  function switchTab(name) {
+    const tabs = ['pending','approved','rejected','all'];
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === name));
+    document.querySelectorAll('.tab-content').forEach((tc,i) => tc.classList.toggle('active', tabs[i] === name));
+  }
+
+  function approve(id) {
+    AUTH.approveUser(id);
+    toast('✅ Usuario aprobado');
+    render();
+  }
+
+  function reject(id) {
+    AUTH.rejectUser(id);
+    toast('Usuario rechazado', 'err');
+    render();
+  }
+
+  function deleteUser(id) {
+    if (!confirm('¿Eliminar este usuario permanentemente?')) return;
+    AUTH.deleteUser(id);
+    toast('Usuario eliminado', 'err');
+    render();
+  }
+
+  function saveNotes(id, val) {
+    AUTH.updateNotes(id, val);
+    toast('Notas guardadas');
+  }
+
+  function viewUser(id) {
+    const users = AUTH.getUsers();
+    const u = users.find(u => u.id === id);
+    if (!u) return;
+    const stats = DB.getUserStats(id);
+    document.getElementById('modal-name').textContent = u.name;
+    document.getElementById('modal-email').textContent = u.email;
+    document.getElementById('modal-rows').innerHTML = `
+      <div class="modal-row"><span class="modal-label">Estado</span><span class="modal-val">${u.status.toUpperCase()}</span></div>
+      <div class="modal-row"><span class="modal-label">Registro</span><span class="modal-val">${fmt(u.registeredAt)}</span></div>
+      <div class="modal-row"><span class="modal-label">Aprobado</span><span class="modal-val">${fmt(u.approvedAt)}</span></div>
+      <div class="modal-row"><span class="modal-label">Último Login</span><span class="modal-val">${fmt(u.lastLogin)}</span></div>
+      <div class="modal-row"><span class="modal-label">Términos Aceptados</span><span class="modal-val">${u.acceptedTerms ? 'SÍ' : 'NO'}</span></div>
+      <div class="modal-row"><span class="modal-label">Trades Totales</span><span class="modal-val">${stats.total}</span></div>
+      <div class="modal-row"><span class="modal-label">Win Rate</span><span class="modal-val">${stats.winRate}%</span></div>
+      <div class="modal-row"><span class="modal-label">P&L Acumulado</span><span class="modal-val">${stats.pnl >= 0 ? '+' : ''}${stats.pnl}%</span></div>
+      <div class="modal-row"><span class="modal-label">Notas Admin</span><span class="modal-val">${u.notes || '—'}</span></div>
+    `;
+    document.getElementById('modal-user').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-user').classList.remove('show');
+  }
+
+  function render() {
+    const users = AUTH.getUsers().filter(u => u.role !== 'admin');
+    const stats = AUTH.getStats();
+
+    document.getElementById('s-total').textContent = stats.total;
+    document.getElementById('s-pending').textContent = stats.pending;
+    document.getElementById('s-approved').textContent = stats.approved;
+    document.getElementById('s-rejected').textContent = stats.rejected;
+    document.getElementById('pending-count').textContent = stats.pending + ' solicitudes';
+
+    const pending  = users.filter(u => u.status === 'pending');
+    const approved = users.filter(u => u.status === 'approved');
+    const rejected = users.filter(u => u.status === 'rejected');
+
+    // PENDING
+    document.getElementById('tbody-pending').innerHTML = pending.length === 0
+      ? `<tr><td colspan="5"><div class="empty-state"><span class="empty-icon">✅</span>Sin solicitudes pendientes</div></td></tr>`
+      : pending.map(u => `
+        <tr>
+          <td><div class="user-name">${u.name}</div><div class="user-email">${u.email}</div></td>
+          <td><div class="user-date">${fmt(u.registeredAt)}</div></td>
+          <td><span style="color:${u.acceptedTerms?'var(--green)':'var(--red)'};">${u.acceptedTerms?'✓ Sí':'✗ No'}</span></td>
+          <td><input class="notes-input" placeholder="Notas..." value="${u.notes||''}" onblur="saveNotes('${u.id}',this.value)"></td>
+          <td><div class="action-btns">
+            <button class="btn-sm btn-approve" onclick="approve('${u.id}')">✓ Aprobar</button>
+            <button class="btn-sm btn-reject" onclick="reject('${u.id}')">✗ Rechazar</button>
+            <button class="btn-sm btn-view" onclick="viewUser('${u.id}')">Ver</button>
+          </div></td>
+        </tr>`).join('');
+
+    // APPROVED
+    document.getElementById('tbody-approved').innerHTML = approved.length === 0
+      ? `<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">👥</span>Sin usuarios aprobados aún</div></td></tr>`
+      : approved.map(u => {
+          const s = DB.getUserStats(u.id);
+          return `<tr>
+            <td><div class="user-name">${u.name}</div><div class="user-email">${u.email}</div></td>
+            <td><div class="user-date">${fmt(u.approvedAt)}</div></td>
+            <td><div class="user-date">${fmt(u.lastLogin)}</div></td>
+            <td><span style="font-family:var(--fm);font-size:11px;color:var(--cyan)">${s.total} trades</span></td>
+            <td><input class="notes-input" placeholder="Notas..." value="${u.notes||''}" onblur="saveNotes('${u.id}',this.value)"></td>
+            <td><div class="action-btns">
+              <button class="btn-sm btn-view" onclick="viewUser('${u.id}')">Ver detalle</button>
+              <button class="btn-sm btn-reject" onclick="reject('${u.id}')">Suspender</button>
+              <button class="btn-sm btn-delete" onclick="deleteUser('${u.id}')">Eliminar</button>
+            </div></td>
+          </tr>`;}).join('');
+
+    // REJECTED
+    document.getElementById('tbody-rejected').innerHTML = rejected.length === 0
+      ? `<tr><td colspan="4"><div class="empty-state"><span class="empty-icon">📋</span>Sin usuarios rechazados</div></td></tr>`
+      : rejected.map(u => `
+        <tr>
+          <td><div class="user-name">${u.name}</div><div class="user-email">${u.email}</div></td>
+          <td><div class="user-date">${fmt(u.registeredAt)}</div></td>
+          <td><input class="notes-input" placeholder="Notas..." value="${u.notes||''}" onblur="saveNotes('${u.id}',this.value)"></td>
+          <td><div class="action-btns">
+            <button class="btn-sm btn-approve" onclick="approve('${u.id}')">Reactivar</button>
+            <button class="btn-sm btn-delete" onclick="deleteUser('${u.id}')">Eliminar</button>
+          </div></td>
+        </tr>`).join('');
+
+    // ALL
+    document.getElementById('tbody-all').innerHTML = users.length === 0
+      ? `<tr><td colspan="5"><div class="empty-state"><span class="empty-icon">👥</span>Sin usuarios registrados</div></td></tr>`
+      : users.map(u => {
+          const s = DB.getUserStats(u.id);
+          const sc = u.status==='approved'?'approved':u.status==='rejected'?'rejected':'pending';
+          return `<tr>
+            <td><div class="user-name">${u.name}</div><div class="user-email">${u.email}</div></td>
+            <td><span class="status-badge ${sc}">${u.status}</span></td>
+            <td><div class="user-date">${fmt(u.registeredAt)}</div></td>
+            <td><span style="font-family:var(--fm);font-size:11px;color:var(--cyan)">${s.total}</span></td>
+            <td><div class="action-btns">
+              <button class="btn-sm btn-view" onclick="viewUser('${u.id}')">Ver</button>
+              ${u.status==='pending'?`<button class="btn-sm btn-approve" onclick="approve('${u.id}')">Aprobar</button>`:''}
+              ${u.status==='approved'?`<button class="btn-sm btn-reject" onclick="reject('${u.id}')">Suspender</button>`:''}
+              ${u.status==='rejected'?`<button class="btn-sm btn-approve" onclick="approve('${u.id}')">Reactivar</button>`:''}
+              <button class="btn-sm btn-delete" onclick="deleteUser('${u.id}')">Eliminar</button>
+            </div></td>
+          </tr>`;}).join('');
+  }
+
+  render();
+  setInterval(render, 10000);
+</script>
+</body>
+</html>

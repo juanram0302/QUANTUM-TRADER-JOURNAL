@@ -1,0 +1,333 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400">
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0d0a00"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+
+    <!-- Gold gradients -->
+    <linearGradient id="goldMain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="30%" stop-color="#ffd600"/>
+      <stop offset="60%" stop-color="#c8960c"/>
+      <stop offset="100%" stop-color="#ffd600"/>
+    </linearGradient>
+
+    <linearGradient id="goldGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe580" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#b8860b" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <linearGradient id="goldEdge" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffd600" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffd600" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffd600" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Globe grid gradient -->
+    <linearGradient id="globeGrad" cx="40%" cy="40%" r="60%" id="globeRad" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#1a1200"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+
+    <radialGradient id="globeRadial" cx="38%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#1a1200"/>
+      <stop offset="60%" stop-color="#0a0800"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+
+    <!-- Candle bull gradient -->
+    <linearGradient id="candleBull" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffd600"/>
+      <stop offset="100%" stop-color="#b8860b"/>
+    </linearGradient>
+
+    <!-- Candle bear gradient -->
+    <linearGradient id="candleBear" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a1200"/>
+      <stop offset="100%" stop-color="#0d0900"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="glowStrong" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="glowText" x="-10%" y="-30%" width="120%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip for globe -->
+    <clipPath id="globeClip">
+      <circle cx="140" cy="200" r="108"/>
+    </clipPath>
+
+    <!-- Text clip -->
+    <clipPath id="leftClip">
+      <rect x="0" y="0" width="270" height="400"/>
+    </clipPath>
+  </defs>
+
+  <!-- BACKGROUND -->
+  <rect width="800" height="400" fill="url(#bgGrad)"/>
+
+  <!-- Subtle gold ambient light behind globe -->
+  <ellipse cx="140" cy="200" rx="140" ry="140" fill="#ffd600" opacity="0.04" filter="url(#softGlow)"/>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- GLOBE — World as a chart              -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <!-- Globe base -->
+  <circle cx="140" cy="200" r="108" fill="url(#globeRadial)" stroke="#ffd600" stroke-width="1.5" opacity="0.9"/>
+
+  <!-- Globe latitude lines (horizontal arcs) -->
+  <g clip-path="url(#globeClip)" opacity="0.25">
+    <ellipse cx="140" cy="200" rx="108" ry="18" fill="none" stroke="#ffd600" stroke-width="0.6"/>
+    <ellipse cx="140" cy="200" rx="108" ry="45" fill="none" stroke="#ffd600" stroke-width="0.5"/>
+    <ellipse cx="140" cy="200" rx="108" ry="72" fill="none" stroke="#ffd600" stroke-width="0.5"/>
+    <ellipse cx="140" cy="200" rx="108" ry="92" fill="none" stroke="#ffd600" stroke-width="0.4"/>
+    <line x1="32" y1="200" x2="248" y2="200" stroke="#ffd600" stroke-width="0.6"/>
+  </g>
+
+  <!-- Globe longitude lines (vertical ellipses) -->
+  <g clip-path="url(#globeClip)" opacity="0.2">
+    <ellipse cx="140" cy="200" rx="20" ry="108" fill="none" stroke="#ffd600" stroke-width="0.6"/>
+    <ellipse cx="140" cy="200" rx="50" ry="108" fill="none" stroke="#ffd600" stroke-width="0.5"/>
+    <ellipse cx="140" cy="200" rx="80" ry="108" fill="none" stroke="#ffd600" stroke-width="0.5"/>
+    <line x1="140" y1="92" x2="140" y2="308" stroke="#ffd600" stroke-width="0.6"/>
+  </g>
+
+  <!-- Globe subtle radial highlight -->
+  <circle cx="120" cy="165" r="40" fill="white" opacity="0.03"/>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- CANDLESTICK CHART overlaid on globe               -->
+  <!-- This IS the world — chart growing from the globe  -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <!-- Candles emerging from the globe, centered -->
+  <g clip-path="url(#globeClip)" filter="url(#glow)">
+
+    <!-- Candle 1 — Bear (left) -->
+    <line x1="80" y1="232" x2="80" y2="196" stroke="#ffd600" stroke-width="1" opacity="0.5"/>
+    <rect x="73" y="210" width="14" height="22" fill="#0d0900" stroke="#ffd600" stroke-width="1" opacity="0.8"/>
+
+    <!-- Candle 2 — Bull -->
+    <line x1="104" y1="238" x2="104" y2="195" stroke="#ffd600" stroke-width="1" opacity="0.6"/>
+    <rect x="97" y="210" width="14" height="28" fill="url(#candleBull)" opacity="0.9"/>
+
+    <!-- Candle 3 — Bear -->
+    <line x1="128" y1="230" x2="128" y2="185" stroke="#ffd600" stroke-width="1" opacity="0.6"/>
+    <rect x="121" y="200" width="14" height="30" fill="#1a1200" stroke="#ffd600" stroke-width="1" opacity="0.8"/>
+
+    <!-- Candle 4 — Bull big -->
+    <line x1="152" y1="240" x2="152" y2="168" stroke="#ffd600" stroke-width="1.2" opacity="0.7"/>
+    <rect x="145" y="180" width="14" height="52" fill="url(#candleBull)" opacity="1"/>
+
+    <!-- Candle 5 — Bull -->
+    <line x1="176" y1="232" x2="176" y2="158" stroke="#ffd600" stroke-width="1.2" opacity="0.7"/>
+    <rect x="169" y="166" width="14" height="44" fill="url(#candleBull)" opacity="0.95"/>
+
+    <!-- Candle 6 — Bear small -->
+    <line x1="200" y1="228" x2="200" y2="162" stroke="#ffd600" stroke-width="1" opacity="0.6"/>
+    <rect x="193" y="172" width="14" height="25" fill="#1a1200" stroke="#ffd600" stroke-width="1" opacity="0.8"/>
+
+  </g>
+
+  <!-- Price trend line over globe — the "chart of the world" -->
+  <polyline
+    points="68,228 80,218 104,210 128,196 152,178 176,162 200,168 220,152"
+    fill="none"
+    stroke="#ffd600"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.85"
+    filter="url(#glow)"
+    clip-path="url(#globeClip)"
+  />
+
+  <!-- Trend line glow duplicate -->
+  <polyline
+    points="68,228 80,218 104,210 128,196 152,178 176,162 200,168 220,152"
+    fill="none"
+    stroke="#ffd600"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.15"
+    clip-path="url(#globeClip)"
+  />
+
+  <!-- Globe border ring — gold -->
+  <circle cx="140" cy="200" r="108" fill="none" stroke="url(#goldMain)" stroke-width="2" filter="url(#glow)"/>
+
+  <!-- Outer ring -->
+  <circle cx="140" cy="200" r="115" fill="none" stroke="#ffd600" stroke-width="0.5" opacity="0.3"/>
+
+  <!-- BOS marker — institutional touch -->
+  <g clip-path="url(#globeClip)" opacity="0.9">
+    <line x1="128" y1="150" x2="152" y2="150" stroke="#ffd600" stroke-width="1" stroke-dasharray="3,2"/>
+    <text x="155" y="153" font-family="monospace" font-size="8" fill="#ffd600" opacity="0.8">BOS</text>
+  </g>
+
+  <!-- TP marker at trend peak -->
+  <g filter="url(#glow)">
+    <circle cx="224" cy="150" r="4" fill="#ffd600" opacity="0.9"/>
+    <circle cx="224" cy="150" r="7" fill="none" stroke="#ffd600" stroke-width="1" opacity="0.4"/>
+  </g>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- VERTICAL DIVIDER                  -->
+  <!-- ═══════════════════════════════════ -->
+  <line x1="268" y1="60" x2="268" y2="340" stroke="url(#goldEdge)" stroke-width="1"/>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- TYPOGRAPHY — RIGHT SIDE           -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Q monogram / accent mark above -->
+  <text
+    x="296"
+    y="118"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="11"
+    font-weight="400"
+    fill="#ffd600"
+    letter-spacing="6"
+    opacity="0.6"
+    filter="url(#glowText)"
+  >✦ INSTITUTIONAL TRADING SYSTEM ✦</text>
+
+  <!-- QUANTUM — main wordmark -->
+  <text
+    x="292"
+    y="192"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="82"
+    font-weight="700"
+    fill="url(#goldMain)"
+    letter-spacing="-2"
+    filter="url(#glowText)"
+  >QUANTUM</text>
+
+  <!-- Subtle inner highlight on QUANTUM text -->
+  <text
+    x="292"
+    y="192"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="82"
+    font-weight="700"
+    fill="none"
+    stroke="#ffe580"
+    stroke-width="0.5"
+    letter-spacing="-2"
+    opacity="0.3"
+  >QUANTUM</text>
+
+  <!-- TRADER — secondary wordmark -->
+  <text
+    x="295"
+    y="240"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="48"
+    font-weight="400"
+    fill="#ffd600"
+    letter-spacing="18"
+    opacity="0.9"
+    filter="url(#glowText)"
+  >TRADER</text>
+
+  <!-- Horizontal rule under TRADER -->
+  <line x1="294" y1="254" x2="752" y2="254" stroke="url(#goldEdge)" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- SMC PRO — badge style -->
+  <g>
+    <!-- Badge background -->
+    <rect x="294" y="266" width="112" height="28" rx="3" fill="#ffd600" opacity="0.08" stroke="#ffd600" stroke-width="0.8" opacity="0.5"/>
+    <text
+      x="302"
+      y="284"
+      font-family="'Courier New', monospace"
+      font-size="14"
+      font-weight="700"
+      fill="#ffd600"
+      letter-spacing="4"
+      filter="url(#glowText)"
+    >SMC PRO</text>
+
+    <!-- Dot separator -->
+    <circle cx="422" cy="279" r="2" fill="#ffd600" opacity="0.5"/>
+
+    <!-- Version tag -->
+    <text
+      x="432"
+      y="284"
+      font-family="'Courier New', monospace"
+      font-size="11"
+      fill="#ffd600"
+      letter-spacing="2"
+      opacity="0.5"
+    >BOS/CHoCH + FIBONACCI v2.0</text>
+  </g>
+
+  <!-- Bottom tagline -->
+  <text
+    x="294"
+    y="328"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="12"
+    font-style="italic"
+    fill="#ffd600"
+    letter-spacing="2"
+    opacity="0.4"
+  >The world moves. We read the structure.</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- CORNER DETAILS — Tech feel        -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Top-right corner bracket -->
+  <g opacity="0.3" stroke="#ffd600" stroke-width="1" fill="none">
+    <polyline points="770,20 790,20 790,40"/>
+    <polyline points="10,20 10,40"/>
+    <polyline points="10,380 10,360"/>
+    <polyline points="770,380 790,380 790,360"/>
+  </g>
+
+  <!-- Small data markers top right -->
+  <g font-family="'Courier New', monospace" font-size="9" fill="#ffd600" opacity="0.25" letter-spacing="1">
+    <text x="680" y="22">QT-2025-SMC</text>
+    <text x="680" y="388">QUANTUM SYSTEMS</text>
+  </g>
+
+  <!-- Subtle scanline overlay at bottom -->
+  <rect x="0" y="340" width="800" height="60" fill="url(#bgGrad)" opacity="0.3"/>
+
+</svg>
