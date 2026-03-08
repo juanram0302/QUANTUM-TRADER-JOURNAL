@@ -1558,9 +1558,18 @@ function activateMonitor(trade) {
 
   renderMonitor(trade);
 
-  // Simulate price movement every 3 seconds for demo
+  // Fetch real price immediately on activation — detect if already at SL/TP
+  fetchRealPrice(trade.pair || "BTCUSDT").then(realPrice => {
+    if (!realPrice) return;
+    trade.currentPrice = realPrice;
+    renderMonitor(trade);
+    // Check immediately if SL/TP already hit (e.g. trade registered after the fact)
+    checkSLTP(trade);
+  }).catch(() => {});
+
+  // Then keep updating every 5 seconds
   if (state.monitorInterval) clearInterval(state.monitorInterval);
-  state.monitorInterval = setInterval(() => simulatePriceMove(trade), 3000);
+  state.monitorInterval = setInterval(() => simulatePriceMove(trade), 5000);
 }
 
 async function fetchRealPrice(symbol) {
@@ -1585,6 +1594,7 @@ function simulatePriceMove(trade) {
     if (realPrice && realPrice > 0) {
       trade.currentPrice = realPrice;
       renderMonitor(trade);
+      checkSLTP(trade); // Check SL/TP with real price
       return;
     }
     // Fallback to simulation if real price unavailable
@@ -1599,37 +1609,29 @@ function simulatePriceMove(trade) {
     renderMonitor(trade);
   });
   return; // async handles renderMonitor
-  // Check SL
-  if (trade.dir === 'long' && trade.currentPrice <= trade.sl) {
-    trade.currentPrice = trade.sl;
-    closeTrade(trade, 'sl');
-    return;
-  }
-  if (trade.dir === 'short' && trade.currentPrice >= trade.sl) {
-    trade.currentPrice = trade.sl;
-    closeTrade(trade, 'sl');
-    return;
-  }
+  checkSLTP(trade);
+}
 
-  // Check TP
-  if (trade.dir === 'long' && trade.currentPrice >= trade.tp) {
-    trade.currentPrice = trade.tp;
-    closeTrade(trade, 'tp');
-    return;
-  }
-  if (trade.dir === 'short' && trade.currentPrice <= trade.tp) {
-    trade.currentPrice = trade.tp;
-    closeTrade(trade, 'tp');
-    return;
-  }
+// ─── CHECK SL/TP — called on every price update ───
+function checkSLTP(trade) {
+  if (!trade || trade.status !== "open") return;
 
-  // Update EA levels
+  const price = trade.currentPrice;
+  const sl    = parseFloat(trade.sl);
+  const tp    = parseFloat(trade.tp);
+
+  if (trade.dir === 'long'  && price <= sl) { trade.currentPrice = sl; closeTrade(trade, 'sl'); return; }
+  if (trade.dir === 'short' && price >= sl) { trade.currentPrice = sl; closeTrade(trade, 'sl'); return; }
+  if (trade.dir === 'long'  && price >= tp) { trade.currentPrice = tp; closeTrade(trade, 'tp'); return; }
+  if (trade.dir === 'short' && price <= tp) { trade.currentPrice = tp; closeTrade(trade, 'tp'); return; }
+
+
+  // Update EA levels based on progress
   const progress = getProgress(trade);
-  if (progress >= 50 && !trade.ea.be) { trade.ea.be = true; }
-  if (progress >= 65 && !trade.ea.be) { trade.ea.be = true; }
-  if (progress >= 75 && !trade.ea.l3) { trade.ea.l3 = true; }
+  if (progress >= 50 && !trade.ea.be)    { trade.ea.be = true; }
+  if (progress >= 75 && !trade.ea.l3)    { trade.ea.l3 = true; }
   if (progress >= 60 && !trade.ea.trail) { trade.ea.trail = true; }
-  if (progress >= 90 && !trade.ea.l4) { trade.ea.l4 = true; }
+  if (progress >= 90 && !trade.ea.l4)    { trade.ea.l4 = true; }
 
   renderMonitor(trade);
 }
