@@ -1182,6 +1182,22 @@
             <input type="text" id="f-tvsymbol" placeholder="BINANCE:BTCUSDT.P" value="BINANCE:BTCUSDT.P">
           </div>
 
+          <div class="form-group">
+            <label>📸 Imagen del Análisis (opcional)</label>
+            <div id="img-drop" style="border:2px dashed #1e2a3a;border-radius:8px;padding:14px;text-align:center;cursor:pointer;position:relative;transition:all .2s;background:rgba(255,214,0,.01);"
+              ondragover="event.preventDefault();this.style.borderColor='#ffd600'"
+              ondragleave="this.style.borderColor='#1e2a3a'"
+              ondrop="handleImgDrop(event)">
+              <input type="file" id="f-img" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="handleImgSelect(event)">
+              <div id="img-drop-label" style="font-size:12px;color:#4a5568;">📊 Arrastra la captura del análisis o click para buscar</div>
+            </div>
+            <img id="img-preview" style="display:none;width:100%;max-height:140px;object-fit:contain;border-radius:6px;border:1px solid #1e2a3a;margin-top:8px;" alt="">
+          </div>
+
+          <div class="form-group">
+              <label>Nota del Análisis</label>
+              <textarea id="f-notes" placeholder="Pega aquí la nota generada por el analizador SMC..." style="width:100%;background:#060810;border:1px solid #1e2a3a;border-radius:6px;color:#e8edf5;font-family:var(--font-body);font-size:12px;padding:10px;outline:none;resize:vertical;min-height:80px;line-height:1.5;"></textarea>
+            </div>
           <button class="btn btn-primary" id="btn-register" onclick="registerTrade()" disabled>
             REGISTRAR TRADE — EA TOMA EL CONTROL
           </button>
@@ -1421,6 +1437,32 @@ document.getElementById('f-setup').addEventListener('change', function() {
 // ═══════════════════════════════════════════════════════
 // REGISTER TRADE
 // ═══════════════════════════════════════════════════════
+// ─── IMAGE HANDLING ───
+let _tradeImg = null;
+
+function handleImgSelect(e) {
+  const file = e.target.files[0];
+  if(file) loadTradeImg(file);
+}
+function handleImgDrop(e) {
+  e.preventDefault();
+  document.getElementById("img-drop").style.borderColor="#1e2a3a";
+  const file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith("image/")) loadTradeImg(file);
+}
+function loadTradeImg(file) {
+  const r = new FileReader();
+  r.onload = ev => {
+    _tradeImg = ev.target.result; // full base64 data URL
+    const prev = document.getElementById("img-preview");
+    prev.src = _tradeImg;
+    prev.style.display = "block";
+    document.getElementById("img-drop-label").textContent = "✓ " + file.name;
+    document.getElementById("img-drop").style.borderColor = "#ffd600";
+  };
+  r.readAsDataURL(file);
+}
+
 function registerTrade() {
   const pair = document.getElementById('f-pair').value;
   const setup = document.getElementById('f-setup').value;
@@ -1451,6 +1493,8 @@ function registerTrade() {
     tp,
     risk,
     rr: rrVal.toFixed(2),
+    notes: document.getElementById('f-notes').value.trim(),
+    img: _tradeImg || null,
     notes,
     tvsymbol,
     openTime: new Date().toISOString(),
@@ -1473,7 +1517,14 @@ function registerTrade() {
   document.querySelectorAll('.check-item').forEach(el => el.classList.remove('checked'));
   state.checksCompleted = 0;
   document.getElementById('check-counter').textContent = '0/' + state.totalChecks;
-  // Save to Firebase
+  // Reset image and notes
+  _tradeImg = null;
+  document.getElementById("img-preview").style.display = "none";
+  document.getElementById("img-drop-label").textContent = "📊 Arrastra la captura del análisis o click para buscar";
+  document.getElementById("img-drop").style.borderColor = "#1e2a3a";
+  document.getElementById("f-notes").value = "";
+  // Save to localStorage + Firebase
+  saveToLocal(trade);
   saveTradeToFirebase(trade);
   document.getElementById('gate-msg').classList.remove('ok');
   document.getElementById('gate-msg').querySelector('span:first-child').textContent = '⛔';
@@ -1810,46 +1861,107 @@ function stopConfetti() {
 // ═══════════════════════════════════════════════════════
 // STATS
 // ═══════════════════════════════════════════════════════
-function updateStats() {
-  const closed = state.trades.filter(t => t.status === 'closed');
-  const wins = closed.filter(t => t.result === 'tp').length;
-  const weekTrades = state.trades.length;
-  const wr = closed.length > 0 ? Math.round((wins / closed.length) * 100) : null;
+function calcMetrics(trades) {
+  const closed = trades.filter(t => t.status === "closed");
+  const wins   = closed.filter(t => t.result === "tp");
+  const losses = closed.filter(t => t.result === "sl");
 
-  // PnL (simplified: each win = risk * rr, each loss = -risk)
-  let pnl = 0;
+  let grossWin = 0, grossLoss = 0, pnl = 0, maxDD = 0, peak = 0, equity = 0;
+
   closed.forEach(t => {
-    if (t.result === 'tp') pnl += t.risk * t.rr;
-    else pnl -= t.risk;
+    const rr  = parseFloat(t.rr) || 1;
+    const risk = parseFloat(t.risk) || 1;
+    if (t.result === "tp") {
+      const gain = risk * rr;
+      grossWin += gain;
+      pnl += gain;
+    } else {
+      grossLoss += risk;
+      pnl -= risk;
+    }
+    equity = pnl;
+    if (equity > peak) peak = equity;
+    const dd = peak - equity;
+    if (dd > maxDD) maxDD = dd;
   });
 
-  document.getElementById('stat-trades').textContent = weekTrades + '/3';
-  document.getElementById('stat-pnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
-  document.getElementById('stat-pnl').className = 'stat-value ' + (pnl >= 0 ? 'green' : 'red');
-  document.getElementById('stat-wr').textContent = wr !== null ? wr + '%' : '--%';
-  document.getElementById('stat-wr-sub').textContent = closed.length > 0 ? wins + 'W / ' + (closed.length - wins) + 'L' : 'Sin datos';
+  const wr = closed.length > 0 ? (wins.length / closed.length) * 100 : 0;
+  // Profit Factor = Gross Profit / Gross Loss
+  const pf = grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? 999 : 0;
+  // Recovery Factor = Net Profit / Max Drawdown
+  const rf = maxDD > 0 ? pnl / maxDD : pnl > 0 ? 999 : 0;
+
+  return { closed: closed.length, wins: wins.length, losses: losses.length,
+           wr, pnl, grossWin, grossLoss, pf, rf, maxDD };
+}
+
+function updateStats() {
+  const m = calcMetrics(state.trades);
+
+  // Weekly trades count
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate()-now.getDay()); weekStart.setHours(0,0,0,0);
+  const weekTrades = state.trades.filter(t => new Date(t.openTime||0) >= weekStart).length;
+
+  document.getElementById("stat-trades").textContent = weekTrades + "/3";
+  document.getElementById("stat-pnl").textContent = (m.pnl >= 0 ? "+" : "") + m.pnl.toFixed(2) + "%";
+  document.getElementById("stat-pnl").className = "stat-value " + (m.pnl >= 0 ? "green" : "red");
+  document.getElementById("stat-wr").textContent = m.closed > 0 ? Math.round(m.wr) + "%" : "--%";
+  document.getElementById("stat-wr-sub").textContent = m.closed > 0 ? m.wins + "W / " + m.losses + "L" : "Sin datos";
+
+  // Inject PF and RF cards if they don't exist
+  if (!document.getElementById("stat-pf")) {
+    const statsGrid = document.querySelector(".stats-grid");
+    if (statsGrid) {
+      const pfCard = document.createElement("div");
+      pfCard.className = "stat-card";
+      pfCard.id = "stat-pf-card";
+      pfCard.innerHTML = `<div class="stat-label">Profit Factor</div><div class="stat-value" id="stat-pf" style="color:var(--gold)">--</div><div class="stat-sub" id="stat-pf-sub">Bruto / Pérdidas</div>`;
+      statsGrid.appendChild(pfCard);
+
+      const rfCard = document.createElement("div");
+      rfCard.className = "stat-card";
+      rfCard.id = "stat-rf-card";
+      rfCard.innerHTML = `<div class="stat-label">Recovery Factor</div><div class="stat-value" id="stat-rf" style="color:var(--cyan)">--</div><div class="stat-sub" id="stat-rf-sub">P&L / Max DD</div>`;
+      statsGrid.appendChild(rfCard);
+    }
+  }
+
+  // Update PF
+  if (document.getElementById("stat-pf")) {
+    const pfVal = m.pf === 999 ? "∞" : m.pf.toFixed(2);
+    const pfColor = m.pf >= 2 ? "var(--green)" : m.pf >= 1.5 ? "var(--gold)" : "var(--red)";
+    document.getElementById("stat-pf").textContent = m.closed > 0 ? pfVal : "--";
+    document.getElementById("stat-pf").style.color = pfColor;
+    document.getElementById("stat-pf-sub").textContent = m.closed > 0
+      ? "+" + m.grossWin.toFixed(2) + "% / -" + m.grossLoss.toFixed(2) + "%"
+      : "Sin datos";
+  }
+  // Update RF
+  if (document.getElementById("stat-rf")) {
+    const rfVal = m.rf === 999 ? "∞" : m.rf.toFixed(2);
+    const rfColor = m.rf >= 3 ? "var(--green)" : m.rf >= 1.5 ? "var(--gold)" : "var(--red)";
+    document.getElementById("stat-rf").textContent = m.closed > 0 ? rfVal : "--";
+    document.getElementById("stat-rf").style.color = rfColor;
+    document.getElementById("stat-rf-sub").textContent = m.closed > 0
+      ? "Max DD: -" + m.maxDD.toFixed(2) + "%"
+      : "Sin datos";
+  }
 
   // Weekly bars
-  document.getElementById('wbar-trades').style.width = Math.min(100, (weekTrades/3)*100) + '%';
-  document.getElementById('wval-trades').textContent = weekTrades + '/3';
-  const pnlPct = Math.min(100, Math.abs(pnl/2)*100);
-  document.getElementById('wbar-pnl').style.background = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('wbar-pnl').style.width = pnlPct + '%';
-  document.getElementById('wval-pnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
-  document.getElementById('wval-pnl').style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById("wbar-trades").style.width = Math.min(100,(weekTrades/3)*100) + "%";
+  document.getElementById("wval-trades").textContent = weekTrades + "/3";
+  const pnlPct = Math.min(100, Math.abs(m.pnl/2)*100);
+  document.getElementById("wbar-pnl").style.background = m.pnl >= 0 ? "var(--green)" : "var(--red)";
+  document.getElementById("wbar-pnl").style.width = pnlPct + "%";
+  document.getElementById("wval-pnl").textContent = (m.pnl>=0?"+":"") + m.pnl.toFixed(2)+"%";
+  document.getElementById("wval-pnl").style.color = m.pnl >= 0 ? "var(--green)" : "var(--red)";
 
-  // Warnings
-  const alerts = document.getElementById('weekly-alerts');
-  alerts.innerHTML = '';
-  if (weekTrades >= 3) {
-    alerts.innerHTML += `<div class="rule-box" style="border-color:var(--red);color:var(--red)">⛔ Alcanzaste el maximo de 3 trades esta semana. NO operes mas.</div>`;
-  }
-  if (pnl <= -2) {
-    alerts.innerHTML += `<div class="rule-box" style="border-color:var(--red);color:var(--red)">⛔ Alcanzaste el -2% semanal. STOP TOTAL hasta la proxima semana.</div>`;
-  }
-  if (pnl >= 2) {
-    alerts.innerHTML += `<div class="rule-box" style="border-color:var(--green);color:var(--green)">✅ Ganaste 2%+ esta semana. Excelente. Considera descansar el resto de la semana.</div>`;
-  }
+  const alerts = document.getElementById("weekly-alerts");
+  alerts.innerHTML = "";
+  if (weekTrades >= 3) alerts.innerHTML += `<div class="rule-box" style="border-color:var(--red);color:var(--red)">⛔ Máximo de 3 trades esta semana. NO operes más.</div>`;
+  if (m.pnl <= -2) alerts.innerHTML += `<div class="rule-box" style="border-color:var(--red);color:var(--red)">⛔ Alcanzaste el -2% semanal. STOP TOTAL.</div>`;
+  if (m.pnl >= 2) alerts.innerHTML += `<div class="rule-box" style="border-color:var(--green);color:var(--green)">✅ +2% esta semana. Considera descansar el resto.</div>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1864,21 +1976,65 @@ function updateHistory() {
   }
 
   list.innerHTML = [...state.trades].reverse().map(t => {
-    const resultClass = t.status === 'open' ? 'open' : t.result === 'tp' ? 'win' : 'loss';
-    const resultText = t.status === 'open' ? 'ABIERTO' : t.result === 'tp' ? '+' + (t.risk * t.rr).toFixed(2) + '%' : '-' + t.risk + '%';
-    const time = new Date(t.openTime).toLocaleTimeString().slice(0,5);
+    const isOpen   = t.status === 'open';
+    const isWin    = t.result === 'tp';
+    const rClass   = isOpen ? 'open' : isWin ? 'win' : 'loss';
+    const rr       = parseFloat(t.rr) || 1;
+    const risk     = parseFloat(t.risk) || 1;
+    const rText    = isOpen ? 'ABIERTO' : isWin ? '+' + (risk * rr).toFixed(2) + '%' : '-' + risk + '%';
+    const date     = new Date(t.openTime);
+    const dateStr  = date.toLocaleDateString('es',{day:'2-digit',month:'short'});
+    const timeStr  = date.toLocaleTimeString().slice(0,5);
 
     return `
-      <div class="history-item">
-        <div class="history-dir ${t.dir}">${t.dir === 'long' ? '▲' : '▼'}</div>
-        <div class="history-info">
-          <div class="history-pair">${t.pair}</div>
-          <div class="history-meta">${time} · ${t.tf} · <span class="tag ${t.setup}">${t.setup}</span> · RR 1:${t.rr}</div>
+    <div class="history-item" style="flex-direction:column;align-items:stretch;gap:0;padding:0;border-radius:10px;overflow:hidden;margin-bottom:10px;">
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,.02);">
+        <div class="history-dir ${t.dir}" style="min-width:32px;text-align:center;">${t.dir==='long'?'▲':'▼'}</div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:var(--font-display);font-size:14px;font-weight:700;">${t.pair}</span>
+            <span class="tag ${t.setup}" style="font-size:10px;">${t.setup}</span>
+            ${isOpen?'<span style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--cyan);background:rgba(0,229,255,.1);padding:2px 6px;border-radius:3px;">EN VIVO</span>':''}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--font-mono);">
+            ${dateStr} ${timeStr} · ${t.tf} · SL ${parseFloat(t.sl).toFixed(1)} → TP ${parseFloat(t.tp).toFixed(1)} · RR 1:${rr}
+          </div>
         </div>
-        <div class="history-result ${resultClass}">${resultText}</div>
+        <div class="history-result ${rClass}" style="font-size:15px;font-weight:700;">${rText}</div>
       </div>
-    `;
+
+      <!-- Image + Notes row (if any) -->
+      ${(t.img || t.notes) ? `
+      <div style="display:flex;gap:0;border-top:1px solid rgba(255,255,255,.04);">
+        ${t.img ? `
+        <div style="flex:0 0 180px;max-width:180px;border-right:1px solid rgba(255,255,255,.04);cursor:pointer;" onclick="openImgModal('${t.id}')">
+          <img src="${t.img}" style="width:100%;height:110px;object-fit:cover;display:block;opacity:.85;transition:opacity .2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85">
+        </div>` : ''}
+        ${t.notes ? `
+        <div style="flex:1;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.6;max-height:110px;overflow-y:auto;font-family:var(--font-body);">
+          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--accent);margin-bottom:5px;">📝 NOTA DEL ANÁLISIS</div>
+          ${t.notes}
+        </div>` : ''}
+      </div>` : ''}
+    </div>`;
   }).join('');
+}
+
+// Image modal for full-size view
+function openImgModal(tradeId) {
+  const t = state.trades.find(x => x.id === tradeId);
+  if(!t || !t.img) return;
+  let m = document.getElementById("img-modal");
+  if(!m) {
+    m = document.createElement("div");
+    m.id = "img-modal";
+    m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;backdrop-filter:blur(6px);";
+    m.onclick = () => m.remove();
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `<img src="${t.img}" style="max-width:90vw;max-height:90vh;border-radius:8px;border:1px solid #1e2a3a;box-shadow:0 0 60px rgba(0,0,0,.8);">
+    <div style="position:fixed;top:16px;right:20px;font-family:monospace;font-size:11px;color:#4a5568;">Click para cerrar</div>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1897,8 +2053,64 @@ function switchTab(name) {
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+// Load from localStorage immediately on init
+const _localTrades = getFromLocal();
+if (_localTrades.length > 0 && state.trades.length === 0) {
+  state.trades = _localTrades;
+  const _openTrade = state.trades.find(t => t.status === "open");
+  if (_openTrade) { state.activeTrade = _openTrade; startPriceSimulation(_openTrade); }
+}
 updateStats();
 updateHistory();
+renderJournal();
+
+// ═══════════════════════════════════════════════════════
+// LOCAL STORAGE PERSISTENCE
+// ═══════════════════════════════════════════════════════
+function getLocalKey() {
+  const s = sessionStorage.getItem("qt_session");
+  const u = s ? JSON.parse(s) : {};
+  return "qt_trades_" + (u.uid || "local");
+}
+
+function saveToLocal(trade) {
+  try {
+    const key = getLocalKey();
+    const trades = getFromLocal();
+    const idx = trades.findIndex(t => t.id === trade.id);
+    if (idx >= 0) trades[idx] = trade;
+    else trades.push(trade);
+    // Store without large images to avoid quota issues — store img separately
+    const toStore = trades.map(t => {
+      const copy = {...t};
+      if (copy.img) {
+        localStorage.setItem("qt_img_" + copy.id, copy.img);
+        copy.img = "stored"; // flag
+      }
+      return copy;
+    });
+    localStorage.setItem(key, JSON.stringify(toStore));
+  } catch(e) { console.warn("LocalStorage save:", e); }
+}
+
+function getFromLocal() {
+  try {
+    const key = getLocalKey();
+    const raw = localStorage.getItem(key);
+    const trades = raw ? JSON.parse(raw) : [];
+    // Restore images
+    return trades.map(t => {
+      if (t.img === "stored") {
+        t.img = localStorage.getItem("qt_img_" + t.id) || null;
+      }
+      return t;
+    });
+  } catch(e) { return []; }
+}
+
+function saveAllLocal() {
+  state.trades.forEach(t => saveToLocal(t));
+}
 
 // ═══════════════════════════════════════════════════════
 // FIREBASE TRADES SYNC
@@ -1927,6 +2139,17 @@ async function updateTradeInFirebase(trade) {
 }
 
 async function loadTradesFromFirebase() {
+  // First load from localStorage for instant display
+  const localTrades = getFromLocal();
+  if (localTrades.length > 0) {
+    state.trades = localTrades;
+    const open = state.trades.find(t => t.status === "open");
+    if (open) { state.activeTrade = open; startPriceSimulation(open); }
+    renderJournal();
+    updateStats();
+    updateHistory();
+  }
+
   try {
     if (!window._fbDb || !window._fbSession) return;
     const { collection, query, where, orderBy, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
@@ -1937,14 +2160,18 @@ async function loadTradesFromFirebase() {
     );
     const snap = await getDocs(q);
     state.trades = snap.docs.map(d => ({ fbId: d.id, ...d.data() }));
+    // Restore images from local
+    state.trades.forEach(t => {
+      if (!t.img) { const img = localStorage.getItem("qt_img_" + t.id); if(img) t.img = img; }
+    });
     // Restore open trade if any
-    const open = state.trades.find(t => t.status === 'open');
-    if (open) {
-      state.activeTrade = open;
-      startPriceSimulation(open);
-    }
+    const open = state.trades.find(t => t.status === "open");
+    if (open) { state.activeTrade = open; startPriceSimulation(open); }
+    // Sync back to local
+    saveAllLocal();
     renderJournal();
-    renderStats();
+    updateStats();
+    updateHistory();
     console.log("Trades loaded from Firebase:", state.trades.length);
   } catch(e) { console.warn("Firebase load trades:", e); }
 }
@@ -2005,6 +2232,20 @@ if (!_raw) {
     setTimeout(() => {
       if (typeof loadTradesFromFirebase === "function") loadTradesFromFirebase();
     }, 800);
+
+    // Auto-fill analyzer note if transferred from analyzer
+    setTimeout(() => {
+      const nota = sessionStorage.getItem("qt_nota_analisis");
+      if (nota) {
+        const el = document.getElementById("f-notes");
+        if (el) {
+          el.value = nota;
+          el.style.borderColor = "var(--accent)";
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        sessionStorage.removeItem("qt_nota_analisis");
+      }
+    }, 1000);
   });
 }
 </script>
